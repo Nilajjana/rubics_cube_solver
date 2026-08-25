@@ -15,7 +15,7 @@ class Encoder
          void decodeCO(uint16_t index, uint8_t* co);
          void decodeEO(uint16_t index, uint8_t* eo);
          void decodeSlice(uint16_t index, uint8_t* ep);
-         void decodeLehmer8(uint16_t index, uint8_t (&cp)[8]);
+         void decodeLehmer8(uint16_t index, uint8_t* p);
          void decodeLehmer4(uint16_t index, uint8_t* p);
 };
 #endif // ENCODER

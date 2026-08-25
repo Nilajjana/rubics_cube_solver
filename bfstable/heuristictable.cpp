@@ -18,7 +18,7 @@ namespace Heuristic
 }
 
 
-void heuristictable::loadTables()
+void Heuristictable::loadTables()
 {
     loadTable("tables/twist_slice.bin", Heuristic::twistSliceTable);
     loadTable("tables/flip_slice.bin", Heuristic::flipSliceTable);
@@ -27,7 +27,7 @@ void heuristictable::loadTables()
 }
 
 
-void heuristictable::generateTables()
+void Heuristictable::generateTables()
 {
     // Generate pruning tables
     std::cout<<"generating tables\n";
@@ -35,6 +35,7 @@ void heuristictable::generateTables()
     bf.bfstwstsls(Heuristic::twistSliceTable);
     bf.bfsflpsls(Heuristic::flipSliceTable);
     bf.bfscpsls(Heuristic::cpSliceTable);
+    bf.bfsepsls(Heuristic::udEdgeSliceTable);
     // TODO:
     // bf cpslice
     // bf udedge_slice
@@ -46,7 +47,7 @@ void heuristictable::generateTables()
 }
 
 
-void heuristictable::saveTable(
+void Heuristictable::saveTable(
     const std::string& filename,
     const std::vector<uint8_t>& table)
 {
@@ -65,7 +66,7 @@ void heuristictable::saveTable(
 }
 
 
-void heuristictable::loadTable(const std::string& filename, std::vector<uint8_t>& table)
+void Heuristictable::loadTable(const std::string& filename, std::vector<uint8_t>& table)
 {
     std::ifstream in(filename, std::ios::binary);
 
@@ -82,7 +83,7 @@ void heuristictable::loadTable(const std::string& filename, std::vector<uint8_t>
 }
 
 
-void heuristictable::load_or_generatetable()
+void Heuristictable::load_or_generatetable()
 {
     namespace fs = std::filesystem;
 

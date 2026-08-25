@@ -10,9 +10,11 @@ class Bfs
         int slicemoves(int mv,Cubieste& cb,int slice);
         int eomoves(int crdnt , Cubieste& cb,int mv);
         int cpmoves(int crdnt, Cubieste& cb, int mv);
+        int epmoves(int crdnt, Cubieste& cb, int mv);
         int slicemoves2(int mv,Cubieste& cb,int slice);
         void bfstwstsls(std::vector<uint8_t>& twistSliceTable);
         void bfsflpsls(std::vector<uint8_t>& flipSliceTable);
         void bfscpsls(std::vector<uint8_t>& cpSliceTable);
+        void bfsepsls(std::vector<uint8_t>& udEdgeSliceTable);
 };
 

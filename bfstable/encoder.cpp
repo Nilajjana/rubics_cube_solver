@@ -43,7 +43,6 @@ uint16_t Encoder::lehmer8coder(const uint8_t* cp)
              (cp[7] < cp[5]);
 
     int c6 = cp[7] < cp[6];
-
     return (c0 * 5040 +
            c1 * 720  +
            c2 * 120  +
@@ -64,7 +63,6 @@ uint16_t Encoder::encodeCO(const uint8_t* co)
 uint16_t Encoder::encodeEO(const uint8_t* eo)
 {
     uint16_t index = 0;
-
     for (int i = 0; i < 11; ++i)
         index = (index << 1) | eo[i];
 
@@ -276,16 +274,18 @@ namespace
     }
 }
 
-void Encoder::decodeLehmer8(uint16_t index, uint8_t (&cp)[8])
+void Encoder::decodeLehmer8(uint16_t index, uint8_t* p)
 {
     constexpr uint16_t kPermCount = 40320; // 8!
+    if (p == nullptr)
+        throw std::invalid_argument("Encoder::decodeLehmer8: p is null");
 
     if (index >= kPermCount)
         throw std::out_of_range(
             "Encoder::decodeLehmer8: index " + std::to_string(index) +
             " out of range [0, 40320)");
 
-    decodePermutation<8>(index, cp);
+    decodePermutation<8>(index, p);
 }
 
 void Encoder::decodeLehmer4(uint16_t index, uint8_t* p)

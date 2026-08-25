@@ -62,6 +62,14 @@ int Bfs::cpmoves(int crdnt, Cubieste& cb, int mv)
     cb = Moves::applyMove(cb, mv);
     return ec.lehmer8coder(cb.cp);
 }
+int Bfs::epmoves(int crdnt, Cubieste& cb, int mv)
+{
+    Encoder ec;
+    int cdep = crdnt / 24;
+    ec.decodeLehmer8(cdep, &cb.ep[0]);
+    cb = Moves::applyMove(cb, mv);
+    return ec.lehmer8coder(cb.cp);
+}
 
 void Bfs::bfstwstsls(std::vector<uint8_t>& twistSliceTable)
 {
@@ -113,7 +121,7 @@ void Bfs::bfstwstsls(std::vector<uint8_t>& twistSliceTable)
             front=qu.front();
             if(twistSliceTable[front]==255)
             {
-                twistSliceTable[front]=level;
+                twistSliceTable[front]=level+1;
             }
             qu.pop();
             for(i=0;i<18;i++)
@@ -129,7 +137,7 @@ void Bfs::bfstwstsls(std::vector<uint8_t>& twistSliceTable)
         }
         level++;
     }
-    std::cout<<"the max level in twist slice is "<<(int)(level-1)<<"\n";
+    std::cout<<"the max level in twist slice is "<<(int)(level-1)<<" which ended at "<<twistSliceTable.size()<<"\n";
 }
 
 void Bfs::bfsflpsls(std::vector<uint8_t>& flipSliceTable)
@@ -164,7 +172,7 @@ void Bfs::bfsflpsls(std::vector<uint8_t>& flipSliceTable)
             front=qu.front();
             if(flipSliceTable[front]==255)
             {
-                flipSliceTable[front]=level;
+                flipSliceTable[front]=level+1;
             }
             qu.pop();
             for(i=0;i<18;i++)
@@ -180,7 +188,7 @@ void Bfs::bfsflpsls(std::vector<uint8_t>& flipSliceTable)
         }
         level++;
     }
-    std::cout<<"the max level in flip slice is "<<(int)(level-1)<<"\n";
+    std::cout<<"the max level in flip slice is "<<(int)(level-1)<<" which ended at "<<flipSliceTable.size()<<"\n";
 }
 void Bfs::bfscpsls(std::vector<uint8_t>& cpSliceTable)
 {
@@ -221,7 +229,7 @@ void Bfs::bfscpsls(std::vector<uint8_t>& cpSliceTable)
             front=qu.front();
             if(cpSliceTable[front]==255)
             {
-                cpSliceTable[front]=level;
+                cpSliceTable[front]=level+1;
             }
             qu.pop();
             for(i=0;i<18;i++)
@@ -237,5 +245,56 @@ void Bfs::bfscpsls(std::vector<uint8_t>& cpSliceTable)
         }
         level++;
     }
-    std::cout<<"the max level cp slice is "<<(int)(level-1)<<"\n";
+    std::cout<<"the max level cp slice is "<<(int)(level-1)<<" which ended at "<<cpSliceTable.size()<<"\n";
+}
+
+void Bfs::bfsepsls(std::vector<uint8_t>& udEdgeSliceTable)
+{
+    Cubieste cb;
+    for(int i=0;i<8;i++)
+    {
+        cb.cp[i]=i;
+        cb.co[i]=0;
+    }
+    for(int i=0;i<12;i++)
+    {
+        cb.ep[i]=i;
+        cb.eo[i]=0;
+    }
+    Encoder ec;
+    uint16_t cdep=ec.lehmer8coder(cb.ep);
+    uint16_t cdsl2=ec.lehmer4(&cb.ep[8]);
+    int crdnt=cdep*24+cdsl2;
+    std::queue<int> qu;
+    qu.push(crdnt);
+    int size=0;
+    int front;
+    int i=0;
+    int coor=0;
+    uint8_t level=0;
+    while(!qu.empty())
+    {
+        size=qu.size();
+        while(size--)
+        {
+            front=qu.front();
+            if(udEdgeSliceTable[front]==255)
+            {
+                udEdgeSliceTable[front]=level+1;
+            }
+            qu.pop();
+            for(i=0;i<18;i++)
+            {
+                coor=epmoves(front,cb,i);
+                coor=coor*24+slicePermMove[front%24][i];
+                if(udEdgeSliceTable[coor]==255)
+                {
+                    udEdgeSliceTable[coor]=level+1;
+                    qu.push(coor);
+                }
+            }
+        }
+        level++;
+    }
+    std::cout<<"the max level ud edge p slice is "<<(int)(level-1)<<" which ended at "<<udEdgeSliceTable.size()<<"\n";
 }

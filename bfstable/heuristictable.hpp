@@ -39,7 +39,7 @@ namespace Heuristic
     
     extern std::vector<uint8_t> udEdgeSliceTable;
 }
-class heuristictable
+class Heuristictable
 {
     public:
         void generateTables();

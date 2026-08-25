@@ -57,7 +57,7 @@ int main()
         std::cout<<static_cast<int>(cb.ep[i])<<"   "<<static_cast<int>(cb.eo[i])<<"\n";
     }
     int vald1=ip.inpvald(cb.cp,8);
-    int vald2=ip.inpvald(cb.ep,12);\
+    int vald2=ip.inpvald(cb.ep,12);
     uint8_t sum=0;
     for(int i=0;i<8;i++)
     {
@@ -71,13 +71,11 @@ int main()
     }
     int eosas=sum%2;
     
-    if(vald1!=vald2||cosas==eosas||cosas==0)
+    if(vald1!=vald2||cosas!=0||eosas!=0)
     {
         std::cout<<"the input is wrong pls enter correct input";
         return 0;
     }
-    heuristictable ht;
+    Heuristictable ht;
     ht.load_or_generatetable();
-    //ht.load_or_generatetable();
-    return 0;
 }
