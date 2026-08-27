@@ -1,5 +1,8 @@
 #if !defined(HEURISTIC)
 #define HEURISTIC
+#include <vector>
+#include <string>
+#include <cstdint>
 namespace Heuristic
 {
     constexpr int CO_SIZE    = 2187;   // 3^7

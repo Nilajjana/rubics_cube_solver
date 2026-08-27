@@ -73,30 +73,13 @@ bool samecon(const std::array<char,3> a,const std::array<char,3> b)
             &&(a[2]==b[0]||a[2]==b[1]||a[2]==b[2]));
 }
 
-int getCO(const std::array<char, 3>& colors,
-          int position)
+int getCO(const std::array<char, 3>& colors, int position)
 {
     for (int i = 0; i < 3; i++)
     {
         if (colors[i] == 'W' || colors[i] == 'Y')
-        {
-            Face face =
-                corner[position].sticker[i].face;
-
-            if (face == U || face == D)
-                {std::cout<<" getCO success"<<"0\n";
-                return 0;}
-
-            if (face == F || face == B)
-                {std::cout<<"getCO success 1  \n";
-                return 1;}
-
-            if (face == R || face == L)
-                {std::cout<<"getCO success  2   \n";
-                return 2;}
-        }
+            return i;   // trust the corner[] table's declared rotational order
     }
-
     return -1;
 }
 

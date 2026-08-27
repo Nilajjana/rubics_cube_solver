@@ -3,11 +3,20 @@
 #include "../inputproc/cubie.hpp"
 #include <vector>
 
+namespace redundancy_chk
+{
+    inline bool redun_dnt(int lastmv,int mv)
+    {
+        if(lastmv/3==mv/3)
+            return true;
+        return false;
+    }
+}
 
 class Dfs
 {
     public:
-        std::vector<uint16_t> dFs(Cubieste cb,uint8_t g,uint8_t bound);
+        int dFs1(const Cubieste& cb,int g,int bound,int lastmv);
 };
 
 #endif 

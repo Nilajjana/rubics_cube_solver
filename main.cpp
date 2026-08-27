@@ -4,8 +4,7 @@
 #include "inputproc/cubie.hpp"
 #include "bfstable/heuristictable.hpp"
 #include "bfstable/encoder.hpp"
-//#include "kociemba/kociembaph1.hpp"
-//#include "kociemba/kociembaph2.hpp"
+#include "kociemba/kociemba_ph1.hpp"
 
 using namespace std;
 
@@ -25,20 +24,47 @@ class tsmltoseg
     Cube usrinp()
     {
         Cube cub;
-        std::cout<<"enter the sticker on the white side\n";
+        std::cout<<"enter the sticker colour on the side which has center white as W,G,Y,R,O,B and white must be up wards with green front and red right and so on fro the respective centers\n";
         cub.U=input();
-        std::cout<<"enter the sticker on the green side\n";
+        std::cout<<"enter the sticker colour on the side which has center green as W,G,Y,R,O,B and green must be up wards with yellow front and red right and so on for the respective centers\n";
         cub.F=input();
-        std::cout<<"enter the sticker on the yellow side\n";
+        std::cout<<"enter the sticker colour on the side which has center yello as W,G,Y,R,O,B and yello must be up wards with blue front and red right and so on for the respective centers\n";
         cub.D=input();
-        std::cout<<"enter the sticker on the red side\n";
+        std::cout<<"enter the sticker colour on the side which has center red as W,G,Y,R,O,B and red must be up wards with yello front and blue right and so on for the respective centers\n";
         cub.R=input();
-        std::cout<<"enter the sticker on the orange side\n";
+        std::cout<<"enter the sticker colour on the side which has center orange as W,G,Y,R,O,B and orange must be up wards with yello front and right green and so on for the respective centers\n";
         cub.L=input();
-        std::cout<<"enter the sticker on the blue side\n";
+        std::cout<<"enter the sticker colour on the side which has center blue as W,G,Y,R,O,B and blue must be up wards with yello front and orange right and so on for the respective centers\n";
         cub.B=input(); 
         std::cout<<"input success\n";
         return cub;
+    }
+    std::string movesToNotation(const std::vector<int>& moves)
+    {
+        static const std::string notation[18] =
+        {
+            "U",  "U2",  "U'",
+            "F",  "F2", "F'",
+            "B",  "B2", "B'",
+            "L",  "L2", "L'",
+            "R",  "R2", "R'",
+            "D",  "D2", "D'"
+        };
+    
+        std::string result;
+    
+        for (int mv : moves)
+        {
+            if (mv < 0 || mv >= 18)
+                continue;   // or throw an error
+        
+            if (!result.empty())
+                result += ' ';
+        
+            result += notation[mv];
+        }
+    
+        return result;
     }
 };
 
@@ -68,7 +94,7 @@ int main()
              |************|
              |*D7**D8**D9*|
              |************|)"<<"\n";
-    cout<<"here Wh= white(U5), Gr=green(F5), Ye=yellow(Y5), Re=red(R5), Bl=blue(B5), Or=orange(O5)\n";
+    cout<<"here Wh= white(U5), Gr=green(F5), Ye=yellow(Y5), Re=red(R5), Bl=blue(B5), Or=orange(O5)\n"<<"\n";
     cub=ob.usrinp();
     inpproc ip;
     Cubieste cb;
@@ -101,16 +127,24 @@ int main()
     
     if(vald1!=vald2||cosas!=0||eosas!=0)
     {
-        std::cout<<"the input is wrong pls enter correct input";
+        std::cout<<"the input is wrong pls enter correct input\n";
         return 0;
     }
 
+    KociembaPhase1 kp1;
+    if(kp1.soln_chkr(cb))
+    {
+        cout<<"it is already solved nigger what do u want are u dumb??\n";
+        return 0;
+    }
     Heuristictable ht;
     ht.load_or_generatetable();
-    //KociembaPhase1 kp1;
-    //kp1.kociembaPhase1(cb);
-    //KociembaPhase2 kp2;
-    //kp2.kociembaPhase2(cb); 
+    string solutionstr1=ob.movesToNotation(solution_sets::solution1);
+    string solutionstr2=ob.movesToNotation(solution_sets::solution2);
+    if(kp1.kociembaPhase1(cb))
+    {
+        cout<<"the solution steps in first phase are:- "<<solutionstr1<<"in the second phase:- "<<solutionstr2;
+    }
     
     return 0;
 }
