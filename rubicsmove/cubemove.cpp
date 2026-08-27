@@ -118,36 +118,27 @@ Cubieste Moves::R(const Cubieste& cube)
 {
     Cubieste result = cube;
 
-    // Corners
+    // Corners (unchanged — already a correct 4-cycle)
     result.cp[0] = cube.cp[4];
     result.cp[3] = cube.cp[0];
     result.cp[7] = cube.cp[3];
     result.cp[4] = cube.cp[7];
 
-    // Corner orientation
     result.co[0] = (cube.co[4] + 2) % 3;
     result.co[3] = (cube.co[0] + 1) % 3;
     result.co[7] = (cube.co[3] + 2) % 3;
     result.co[4] = (cube.co[7] + 1) % 3;
 
-    // Edges
-    //
-    // Your indices:
-    // UR = 3
-    // DR = 7
-    // BR = 10
-    // RF = 11
-
+    // Edges — fixed to a proper 4-cycle: UR -> RF -> BR -> DR -> UR
     result.ep[3]  = cube.ep[11]; // UR <- RF
-    result.ep[7]  = cube.ep[10]; // DR <- BR
+    result.ep[11] = cube.ep[10]; // RF <- BR
     result.ep[10] = cube.ep[7];  // BR <- DR
-    result.ep[11] = cube.ep[3];  // RF <- UR
+    result.ep[7]  = cube.ep[3];  // DR <- UR
 
-    // R does not flip edge orientation
     result.eo[3]  = cube.eo[11];
-    result.eo[7]  = cube.eo[10];
+    result.eo[11] = cube.eo[10];
     result.eo[10] = cube.eo[7];
-    result.eo[11] = cube.eo[3];
+    result.eo[7]  = cube.eo[3];
 
     return result;
 }
@@ -236,28 +227,26 @@ Cubieste Moves::F(const Cubieste& cube)
 {
     Cubieste result = cube;
 
-    // Corners
+    // Corners (unchanged — already a correct 4-cycle)
     result.cp[0] = cube.cp[1];
     result.cp[1] = cube.cp[5];
     result.cp[4] = cube.cp[0];
     result.cp[5] = cube.cp[4];
 
-    // Corner orientation
     result.co[0] = (cube.co[1] + 1) % 3;
     result.co[1] = (cube.co[5] + 2) % 3;
     result.co[4] = (cube.co[0] + 2) % 3;
     result.co[5] = (cube.co[4] + 1) % 3;
 
-    // Edges
-    result.ep[0]  = cube.ep[11]; // UF <- RF
-    result.ep[4]  = cube.ep[8];  // DF <- FL
-    result.ep[8]  = cube.ep[4];  // FL <- DF
-    result.ep[11] = cube.ep[0];  // RF <- UF
+    // Edges — fixed to a proper 4-cycle: UF -> FL -> DF -> RF -> UF
+    result.ep[0]  = cube.ep[8];   // UF <- FL
+    result.ep[8]  = cube.ep[4];   // FL <- DF
+    result.ep[4]  = cube.ep[11];  // DF <- RF
+    result.ep[11] = cube.ep[0];   // RF <- UF
 
-    // F flips these four edges
-    result.eo[0]  = cube.eo[11] ^ 1;
-    result.eo[4]  = cube.eo[8]  ^ 1;
+    result.eo[0]  = cube.eo[8]  ^ 1;
     result.eo[8]  = cube.eo[4]  ^ 1;
+    result.eo[4]  = cube.eo[11] ^ 1;
     result.eo[11] = cube.eo[0]  ^ 1;
 
     return result;

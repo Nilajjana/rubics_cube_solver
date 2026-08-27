@@ -68,7 +68,7 @@ int Bfs::epmoves(int crdnt, Cubieste& cb, int mv)
     int cdep = crdnt / 24;
     ec.decodeLehmer8(cdep, &cb.ep[0]);
     cb = Moves::applyMove(cb, mv);
-    return ec.lehmer8coder(cb.cp);
+    return ec.lehmer8coder(cb.ep);
 }
 
 void Bfs::bfstwstsls(std::vector<uint8_t>& twistSliceTable)
@@ -108,6 +108,7 @@ void Bfs::bfstwstsls(std::vector<uint8_t>& twistSliceTable)
     int crdnt=cdco*495+cdsl;
     std::queue<int> qu;
     qu.push(crdnt);
+    twistSliceTable[crdnt]=0;
     int size=0;
     int front;
     int i=0;
@@ -119,10 +120,6 @@ void Bfs::bfstwstsls(std::vector<uint8_t>& twistSliceTable)
         while(size--)
         {
             front=qu.front();
-            if(twistSliceTable[front]==255)
-            {
-                twistSliceTable[front]=level+1;
-            }
             qu.pop();
             for(i=0;i<18;i++)
             {
@@ -137,6 +134,17 @@ void Bfs::bfstwstsls(std::vector<uint8_t>& twistSliceTable)
         }
         level++;
     }
+    size_t unvisited = 0;
+
+    for (uint8_t v : twistSliceTable)
+    {
+        if (v == 255)
+            unvisited++;
+    }
+
+    std::cout << "Unvisited states: " << unvisited << '\n';
+    std::cout << "Visited states: "
+          << twistSliceTable.size() - unvisited << '\n';
     std::cout<<"the max level in twist slice is "<<(int)(level-1)<<" which ended at "<<twistSliceTable.size()<<"\n";
 }
 
@@ -159,6 +167,7 @@ void Bfs::bfsflpsls(std::vector<uint8_t>& flipSliceTable)
     int crdnt=cdeo*495+cdsl;
     std::queue<int> qu;
     qu.push(crdnt);
+    flipSliceTable[crdnt]=0;
     int size=0;
     int front;
     int i=0;
@@ -170,10 +179,6 @@ void Bfs::bfsflpsls(std::vector<uint8_t>& flipSliceTable)
         while(size--)
         {
             front=qu.front();
-            if(flipSliceTable[front]==255)
-            {
-                flipSliceTable[front]=level+1;
-            }
             qu.pop();
             for(i=0;i<18;i++)
             {
@@ -188,10 +193,23 @@ void Bfs::bfsflpsls(std::vector<uint8_t>& flipSliceTable)
         }
         level++;
     }
+
+    size_t unvisited = 0;
+
+    for (uint8_t v : flipSliceTable)
+    {
+        if (v == 255)
+            unvisited++;
+    }
+
+    std::cout << "Unvisited states: " << unvisited << '\n';
+    std::cout << "Visited states: "
+          << flipSliceTable.size() - unvisited << '\n';
     std::cout<<"the max level in flip slice is "<<(int)(level-1)<<" which ended at "<<flipSliceTable.size()<<"\n";
 }
 void Bfs::bfscpsls(std::vector<uint8_t>& cpSliceTable)
 {
+    constexpr int kPhase2Moves[10] = { 0, 1, 2, 4, 7, 10, 13, 15, 16, 17 }; // U, U2, U', F2, B2, L2, R2, D, D2, D'
     Cubieste cb;
     for(int i=0;i<8;i++)
     {
@@ -206,16 +224,28 @@ void Bfs::bfscpsls(std::vector<uint8_t>& cpSliceTable)
     Encoder ec;
     for(int slice=0;slice<24;slice++)
     {
-        for(int i=0;i<18;i++)
+        for(int i:kPhase2Moves)
         {
             slicePermMove[slice][i]=slicemoves2(i,cb,slice);
         }
+    }
+
+    for(int i=0;i<8;i++)
+    {
+        cb.cp[i]=i;
+        cb.co[i]=0;
+    }
+    for(int i=0;i<12;i++)
+    {
+        cb.ep[i]=i;
+        cb.eo[i]=0;
     }
     uint16_t cdcp=ec.lehmer8coder(cb.cp);
     uint16_t cdsl2=ec.lehmer4(&cb.ep[8]);
     int crdnt=cdcp*24+cdsl2;
     std::queue<int> qu;
     qu.push(crdnt);
+    cpSliceTable[crdnt]=0;
     int size=0;
     int front;
     int i=0;
@@ -227,12 +257,8 @@ void Bfs::bfscpsls(std::vector<uint8_t>& cpSliceTable)
         while(size--)
         {
             front=qu.front();
-            if(cpSliceTable[front]==255)
-            {
-                cpSliceTable[front]=level+1;
-            }
             qu.pop();
-            for(i=0;i<18;i++)
+            for(int i:kPhase2Moves)
             {
                 coor=cpmoves(front,cb,i);
                 coor=coor*24+slicePermMove[front%24][i];
@@ -245,6 +271,17 @@ void Bfs::bfscpsls(std::vector<uint8_t>& cpSliceTable)
         }
         level++;
     }
+    size_t unvisited = 0;
+
+    for (uint8_t v : cpSliceTable)
+    {
+        if (v == 255)
+            unvisited++;
+    }
+
+    std::cout << "Unvisited states: " << unvisited << '\n';
+    std::cout << "Visited states: "
+          << cpSliceTable.size() - unvisited << '\n';
     std::cout<<"the max level cp slice is "<<(int)(level-1)<<" which ended at "<<cpSliceTable.size()<<"\n";
 }
 
@@ -262,11 +299,13 @@ void Bfs::bfsepsls(std::vector<uint8_t>& udEdgeSliceTable)
         cb.eo[i]=0;
     }
     Encoder ec;
+    constexpr int kPhase2Moves[10] = { 0, 1, 2, 4, 7, 10, 13, 15, 16, 17 }; // U, U2, U', F2, B2, L2, R2, D, D2, D'
     uint16_t cdep=ec.lehmer8coder(cb.ep);
     uint16_t cdsl2=ec.lehmer4(&cb.ep[8]);
     int crdnt=cdep*24+cdsl2;
     std::queue<int> qu;
     qu.push(crdnt);
+    udEdgeSliceTable[crdnt]=0;
     int size=0;
     int front;
     int i=0;
@@ -278,12 +317,8 @@ void Bfs::bfsepsls(std::vector<uint8_t>& udEdgeSliceTable)
         while(size--)
         {
             front=qu.front();
-            if(udEdgeSliceTable[front]==255)
-            {
-                udEdgeSliceTable[front]=level+1;
-            }
             qu.pop();
-            for(i=0;i<18;i++)
+            for(int i:kPhase2Moves)
             {
                 coor=epmoves(front,cb,i);
                 coor=coor*24+slicePermMove[front%24][i];
@@ -296,5 +331,16 @@ void Bfs::bfsepsls(std::vector<uint8_t>& udEdgeSliceTable)
         }
         level++;
     }
+    size_t unvisited = 0;
+
+    for (uint8_t v : udEdgeSliceTable)
+    {
+        if (v == 255)
+            unvisited++;
+    }
+
+    std::cout << "Unvisited states: " << unvisited << '\n';
+    std::cout << "Visited states: "
+          << udEdgeSliceTable.size() - unvisited << '\n';
     std::cout<<"the max level ud edge p slice is "<<(int)(level-1)<<" which ended at "<<udEdgeSliceTable.size()<<"\n";
 }

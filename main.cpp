@@ -3,6 +3,10 @@
 #include <bits/stdc++.h>
 #include "inputproc/cubie.hpp"
 #include "bfstable/heuristictable.hpp"
+#include "bfstable/encoder.hpp"
+//#include "kociemba/kociembaph1.hpp"
+//#include "kociemba/kociembaph2.hpp"
+
 using namespace std;
 
 class tsmltoseg
@@ -21,26 +25,50 @@ class tsmltoseg
     Cube usrinp()
     {
         Cube cub;
-        std::cout<<"enter the sticker colour on the side which has center white as W,G,Y,R,O,B and white must be up wards with green front and red right and so on fro the respective centers\n";
+        std::cout<<"enter the sticker on the white side\n";
         cub.U=input();
-        std::cout<<"enter the sticker colour on the side which has center green as W,G,Y,R,O,B and green must be up wards with yellow front and red right and so on for the respective centers\n";
+        std::cout<<"enter the sticker on the green side\n";
         cub.F=input();
-        std::cout<<"enter the sticker colour on the side which has center yello as W,G,Y,R,O,B and yello must be up wards with blue front and red right and so on for the respective centers\n";
+        std::cout<<"enter the sticker on the yellow side\n";
         cub.D=input();
-        std::cout<<"enter the sticker colour on the side which has center red as W,G,Y,R,O,B and red must be up wards with yello front and blue right and so on for the respective centers\n";
+        std::cout<<"enter the sticker on the red side\n";
         cub.R=input();
-        std::cout<<"enter the sticker colour on the side which has center orange as W,G,Y,R,O,B and orange must be up wards with yello front and right green and so on for the respective centers\n";
+        std::cout<<"enter the sticker on the orange side\n";
         cub.L=input();
-        std::cout<<"enter the sticker colour on the side which has center blue as W,G,Y,R,O,B and blue must be up wards with yello front and orange right and so on for the respective centers\n";
+        std::cout<<"enter the sticker on the blue side\n";
         cub.B=input(); 
         std::cout<<"input success\n";
         return cub;
     }
 };
+
+
 int main()
 {
     Cube cub;
     tsmltoseg ob;
+    cout<<R"(|************|
+             |*U1**U2**U3*|
+             |************|
+             |*U4**Wh**U6*|
+             |************|
+             |*U7**U8**U9*|
+             |************|
+ ************|************|************|************
+ *L1**L2**L3*|*F1**F2**F3*|*R1**R2**R3*|*B1**B2**B3*
+ ************|************|************|************
+ *L4**Or**L6*|*F4**Gr**F6*|*R4**Re**R6*|*B4**Bl**B6*
+ ************|************|************|************
+ *L7**L8**L9*|*F7**F8**F9*|*R7**R8**R9*|*B7**B8**B9*
+ ************|************|************|************
+             |************|
+             |*D1**D2**D3*|
+             |************|
+             |*D4**Ye**D6*|
+             |************|
+             |*D7**D8**D9*|
+             |************|)"<<"\n";
+    cout<<"here Wh= white(U5), Gr=green(F5), Ye=yellow(Y5), Re=red(R5), Bl=blue(B5), Or=orange(O5)\n";
     cub=ob.usrinp();
     inpproc ip;
     Cubieste cb;
@@ -76,6 +104,13 @@ int main()
         std::cout<<"the input is wrong pls enter correct input";
         return 0;
     }
+
     Heuristictable ht;
     ht.load_or_generatetable();
+    //KociembaPhase1 kp1;
+    //kp1.kociembaPhase1(cb);
+    //KociembaPhase2 kp2;
+    //kp2.kociembaPhase2(cb); 
+    
+    return 0;
 }

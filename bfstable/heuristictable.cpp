@@ -8,6 +8,7 @@
 
 #include "heuristictable.hpp"
 #include "bfs.hpp"
+#include "encoder.hpp"
 
 namespace Heuristic
 {
@@ -81,7 +82,6 @@ void Heuristictable::loadTable(const std::string& filename, std::vector<uint8_t>
     if (!in)
         throw std::runtime_error("Error reading table: " + filename);
 }
-
 
 void Heuristictable::load_or_generatetable()
 {
