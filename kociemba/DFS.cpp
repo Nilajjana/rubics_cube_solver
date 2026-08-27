@@ -27,7 +27,6 @@ int Dfs::dFs1(const Cubieste& cb,int g,int bound,int lastmv)
     Cubieste next;
     int minin=255;
     Moves mov;
-    std::cout<<"going to explore  level "<<g<<"\n";
     for(int i=0;i<18;i++)
     {
         if(redundancy_chk::redun_dnt(lastmv,i))

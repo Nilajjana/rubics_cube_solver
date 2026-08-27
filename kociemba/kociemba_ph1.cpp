@@ -6,6 +6,7 @@
 #include "DFS.hpp"
 #include "../bfstable/heuristictable.hpp"
 #include <iostream>
+#include <chrono>
 
 // add near the top of kociemba_ph1.cpp, outside any function
 namespace solution_sets
@@ -80,17 +81,34 @@ bool KociembaPhase1::soln_chkr(Cubieste cb)
 
 bool KociembaPhase1::kociembaPhase1(Cubieste& cb)
 {
-    int h=cost_f_n1(cb);
+    int h = cost_f_n1(cb);
     Dfs df;
+
     while (true)
     {
-        int result=df.dFs1(cb,0,h,-1);
-        std::cout<<"one level is explored in phase 1 and now going to level "<<result<<"\n";
-        if(result==-1)
+        auto start = std::chrono::steady_clock::now();
+
+        int result = df.dFs1(cb, 0, h, -1);
+
+        auto end = std::chrono::steady_clock::now();
+
+        auto elapsed =
+            std::chrono::duration_cast<std::chrono::milliseconds>
+            (end - start);
+
+        std::cout << "One level is explored in phase 1. "
+                  << "Bound: " << h
+                  << " | Next bound: " << result
+                  << " | Time: " << elapsed.count()
+                  << " ms\n";
+
+        if (result == -1)
         {
             return true;
         }
-        h=result;
+
+        h = result;
     }
+
     return false;
 }

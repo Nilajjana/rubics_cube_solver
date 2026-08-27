@@ -195,15 +195,22 @@ int geteo(std::array<char,2> colour,int position)
     }
     return -1; // impossible
 }
-Cubieste inpproc::cornerinfer(Cube& cube,Cubieste cst)
+Cubieste inpproc::cornerinfer(Cube& cube, Cubieste cst)
 {
-    for(int i=0;i<8;i++)
+    static const char* names[8] = {"UFR","UFL","ULB","UBR","DFR","DFL","DLB","DRB"};
+    for (int i = 0; i < 8; i++)
     {
-        auto colour=getcolourcon(cube,i);
-        cst.cp[i]=getcp(colour);
-        cst.co[i]=getCO(colour,i);
+        auto colour = getcolourcon(cube, i);
+        int cp = getcp(colour);
+        if (cp == -1)
+        {
+            std::cerr << "ERROR: corner " << names[i] << " (colors "
+                      << colour[0] << colour[1] << colour[2]
+                      << ") did not match any known corner\n";
+        }
+        cst.cp[i] = static_cast<uint8_t>(cp);
+        cst.co[i] = getCO(colour, i);
     }
-    std::cout<<"cornerinfer success\n";
     return cst;
 }
 Cubieste inpproc::edgeinfer(Cube& cube,Cubieste cst)

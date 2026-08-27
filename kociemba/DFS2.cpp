@@ -9,6 +9,7 @@
 #include "../rubicsmove/cubemove.hpp"
 #include "DFS.hpp"
 #include <iostream>
+#include <chrono>
 
 namespace
 {
@@ -39,17 +40,32 @@ int Dfs2::cost_f_n2(Cubieste cb)
 
 bool Dfs2::kociembaPhase2(Cubieste cb)
 {
-    int h=cost_f_n2(cb);
+    int h = cost_f_n2(cb);
+
     while (true)
     {
-        int result=dFs2(cb,0,h,-1);
-        std::cout<<"one level is explored in phase 2 \n";
-        if(result==-1)
+        auto start = std::chrono::steady_clock::now();
+
+        int result = dFs2(cb, 0, h, -1);
+
+        auto end = std::chrono::steady_clock::now();
+
+        std::chrono::duration<double> elapsed = end - start;
+
+        std::cout << "Phase 2 bound " << h
+                  << " completed"
+                  << " | next bound = " << result
+                  << " | time = " << elapsed.count()
+                  << " seconds\n";
+
+        if (result == -1)
         {
             return true;
         }
-        h=result;
+
+        h = result;
     }
+
     return false;
 }
 
@@ -68,7 +84,6 @@ int Dfs2::dFs2(const Cubieste& cb,int g,int bound,int lastmv)
     Cubieste next;
     int minin=255;
     Moves mov;
-    std::cout<<"going to explore level "<<g<<"\n";
     for(int i:moves2::kPhase2Moves)
     {
         if(redundancy_chk::redun_dnt(lastmv,i))
@@ -83,6 +98,7 @@ int Dfs2::dFs2(const Cubieste& cb,int g,int bound,int lastmv)
         
         minin=std::min(minin,result);
         solution_sets::solution2.pop_back();
+        
     }
     return minin;
 }

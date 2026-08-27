@@ -125,7 +125,7 @@ int main()
     }
     int eosas=sum%2;
     
-    if(vald1!=vald2||cosas!=0||eosas!=0)
+    if(vald1!=vald2||(cosas==eosas&&eosas==0))
     {
         std::cout<<"the input is wrong pls enter correct input\n";
         return 0;
