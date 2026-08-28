@@ -1,0 +1,2058 @@
+
+#include <queue>
+#include "../inputproc/cubie.hpp"
+#include "encoder.hpp"
+#include "../rubicsmove/cubemove.hpp"
+#include "bfs.hpp"
+#include <iostream>
+
+int Bfs::comoves(int crdnt, Cubieste& cb, int mv)
+{
+    Encoder ec;
+    int cdco = crdnt / 495;
+    ec.decodeCO(cdco, cb.co);
+    cb = Moves::applyMove(cb, mv);
+    return ec.encodeCO(cb.co);
+}
+
+int Bfs::slicemoves(int mv, Cubieste& cb, int slice)
+{
+    Encoder ec;
+    for (int i = 0; i < 12; i++)
+    {
+        cb.ep[i] = i;
+        cb.eo[i] = 0;
+    }
+    ec.decodeSlice(slice, cb.ep);
+    cb = Moves::applyMove(cb, mv);
+    return ec.encodeSlice(cb.ep);
+}
+
+int Bfs::slicemoves2(int mv, Cubieste& cb, int slice)
+{
+    Encoder ec;
+
+    for (int i = 0; i < 12; i++)
+    {
+        cb.ep[i] = i;
+        cb.eo[i] = 0;
+    }
+
+    ec.decodeLehmer4(slice, &cb.ep[8]);
+    for (int i = 0; i < 4; i++)
+        cb.ep[8 + i] += 8;   // decodeLehmer4 outputs ranks 0..3; shift back to cubie IDs 8..11
+
+    cb = Moves::applyMove(cb, mv);
+    return ec.lehmer4(&cb.ep[8]);
+}
+
+int Bfs::eomoves(int crdnt, Cubieste& cb, int mv)
+{
+    Encoder ec;
+    int cdco = crdnt / 495;
+    ec.decodeEO(cdco, cb.eo);
+    cb = Moves::applyMove(cb, mv);
+    return ec.encodeEO(cb.eo);
+}
+int Bfs::cpmoves(int crdnt, Cubieste& cb, int mv)
+{
+    Encoder ec;
+    int cdcp = crdnt / 24;
+    ec.decodeLehmer8(cdcp, cb.cp);
+    cb = Moves::applyMove(cb, mv);
+    return ec.lehmer8coder(cb.cp);
+}
+int Bfs::epmoves(int crdnt, Cubieste& cb, int mv)
+{
+    Encoder ec;
+    int cdep = crdnt / 24;
+    ec.decodeLehmer8(cdep, &cb.ep[0]);
+    cb = Moves::applyMove(cb, mv);
+    return ec.lehmer8coder(cb.ep);
+}
+
+void Bfs::bfstwstsls(std::vector<uint8_t>& twistSliceTable)
+{
+    Cubieste cb;
+    for(int i=0;i<8;i++)
+    {
+        cb.cp[i]=i;
+        cb.co[i]=0;
+    }
+    for(int i=0;i<12;i++)
+    {
+        cb.ep[i]=i;
+        cb.eo[i]=0;
+    }
+    Encoder ec;
+    for(int slice=0;slice<495;slice++)
+    {
+        for(int i=0;i<18;i++)
+        {
+            sliceMove[slice][i]=slicemoves(i,cb,slice);
+        }
+    }
+
+    for(int i=0;i<8;i++)
+    {
+        cb.cp[i]=i;
+        cb.co[i]=0;
+    }
+    for(int i=0;i<12;i++)
+    {
+        cb.ep[i]=i;
+        cb.eo[i]=0;
+    }
+    uint16_t cdco=ec.encodeCO(cb.co);
+    uint16_t cdsl=ec.encodeSlice(cb.ep);
+    int crdnt=cdco*495+cdsl;
+    std::queue<int> qu;
+    qu.push(crdnt);
+    twistSliceTable[crdnt]=0;
+    int size=0;
+    int front;
+    int i=0;
+    int coor=0;
+    uint8_t level=0;
+    while(!qu.empty())
+    {
+        size=qu.size();
+        while(size--)
+        {
+            front=qu.front();
+            qu.pop();
+            for(i=0;i<18;i++)
+            {
+                coor=comoves(front,cb,i);
+                coor=coor*495+sliceMove[front%495][i];
+                if(twistSliceTable[coor]==255)
+                {
+                    twistSliceTable[coor]=level+1;
+                    qu.push(coor);
+                }
+            }
+        }
+        level++;
+    }
+    size_t unvisited = 0;
+
+    for (uint8_t v : twistSliceTable)
+    {
+        if (v == 255)
+            unvisited++;
+    }
+
+    std::cout << "Unvisited states: " << unvisited << '\n';
+    std::cout << "Visited states: "
+          << twistSliceTable.size() - unvisited << '\n';
+    std::cout<<"the max level in twist slice is "<<(int)(level-1)<<" which ended at "<<twistSliceTable.size()<<"\n";
+}
+
+void Bfs::bfsflpsls(std::vector<uint8_t>& flipSliceTable)
+{
+    Cubieste cb;
+    for(int i=0;i<8;i++)
+    {
+        cb.cp[i]=i;
+        cb.co[i]=0;
+    }
+    for(int i=0;i<12;i++)
+    {
+        cb.ep[i]=i;
+        cb.eo[i]=0;
+    }
+    Encoder ec;
+    uint16_t cdeo=ec.encodeEO(cb.eo);
+    uint16_t cdsl=ec.encodeSlice(cb.ep);
+    int crdnt=cdeo*495+cdsl;
+    std::queue<int> qu;
+    qu.push(crdnt);
+    flipSliceTable[crdnt]=0;
+    int size=0;
+    int front;
+    int i=0;
+    int coor=0;
+    uint8_t level=0;
+    while(!qu.empty())
+    {
+        size=qu.size();
+        while(size--)
+        {
+            front=qu.front();
+            qu.pop();
+            for(i=0;i<18;i++)
+            {
+                coor=eomoves(front,cb,i);
+                coor=coor*495+sliceMove[front%495][i];
+                if(flipSliceTable[coor]==255)
+                {
+                    flipSliceTable[coor]=level+1;
+                    qu.push(coor);
+                }
+            }
+        }
+        level++;
+    }
+
+    size_t unvisited = 0;
+
+    for (uint8_t v : flipSliceTable)
+    {
+        if (v == 255)
+            unvisited++;
+    }
+
+    std::cout << "Unvisited states: " << unvisited << '\n';
+    std::cout << "Visited states: "
+          << flipSliceTable.size() - unvisited << '\n';
+    std::cout<<"the max level in flip slice is "<<(int)(level-1)<<" which ended at "<<flipSliceTable.size()<<"\n";
+}
+void Bfs::bfscpsls(std::vector<uint8_t>& cpSliceTable)
+{
+    constexpr int kPhase2Moves[10] = { 0, 1, 2, 4, 7, 10, 13, 15, 16, 17 }; // U, U2, U', F2, B2, L2, R2, D, D2, D'
+    Cubieste cb;
+    for(int i=0;i<8;i++)
+    {
+        cb.cp[i]=i;
+        cb.co[i]=0;
+    }
+    for(int i=0;i<12;i++)
+    {
+        cb.ep[i]=i;
+        cb.eo[i]=0;
+    }
+    Encoder ec;
+    for(int slice=0;slice<24;slice++)
+    {
+        for(int i:kPhase2Moves)
+        {
+            slicePermMove[slice][i]=slicemoves2(i,cb,slice);
+        }
+    }
+
+    for(int i=0;i<8;i++)
+    {
+        cb.cp[i]=i;
+        cb.co[i]=0;
+    }
+    for(int i=0;i<12;i++)
+    {
+        cb.ep[i]=i;
+        cb.eo[i]=0;
+    }
+    uint16_t cdcp=ec.lehmer8coder(cb.cp);
+    uint16_t cdsl2=ec.lehmer4(&cb.ep[8]);
+    int crdnt=cdcp*24+cdsl2;
+    std::queue<int> qu;
+    qu.push(crdnt);
+    cpSliceTable[crdnt]=0;
+    int size=0;
+    int front;
+    int i=0;
+    int coor=0;
+    uint8_t level=0;
+    while(!qu.empty())
+    {
+        size=qu.size();
+        while(size--)
+        {
+            front=qu.front();
+            qu.pop();
+            for(int i:kPhase2Moves)
+            {
+                coor=cpmoves(front,cb,i);
+                coor=coor*24+slicePermMove[front%24][i];
+                if(cpSliceTable[coor]==255)
+                {
+                    cpSliceTable[coor]=level+1;
+                    qu.push(coor);
+                }
+            }
+        }
+        level++;
+    }
+    size_t unvisited = 0;
+
+    for (uint8_t v : cpSliceTable)
+    {
+        if (v == 255)
+            unvisited++;
+    }
+
+    std::cout << "Unvisited states: " << unvisited << '\n';
+    std::cout << "Visited states: "
+          << cpSliceTable.size() - unvisited << '\n';
+    std::cout<<"the max level cp slice is "<<(int)(level-1)<<" which ended at "<<cpSliceTable.size()<<"\n";
+}
+
+void Bfs::bfsepsls(std::vector<uint8_t>& udEdgeSliceTable)
+{
+    Cubieste cb;
+    for(int i=0;i<8;i++)
+    {
+        cb.cp[i]=i;
+        cb.co[i]=0;
+    }
+    for(int i=0;i<12;i++)
+    {
+        cb.ep[i]=i;
+        cb.eo[i]=0;
+    }
+    Encoder ec;
+    constexpr int kPhase2Moves[10] = { 0, 1, 2, 4, 7, 10, 13, 15, 16, 17 }; // U, U2, U', F2, B2, L2, R2, D, D2, D'
+    uint16_t cdep=ec.lehmer8coder(cb.ep);
+    uint16_t cdsl2=ec.lehmer4(&cb.ep[8]);
+    int crdnt=cdep*24+cdsl2;
+    std::queue<int> qu;
+    qu.push(crdnt);
+    udEdgeSliceTable[crdnt]=0;
+    int size=0;
+    int front;
+    int i=0;
+    int coor=0;
+    uint8_t level=0;
+    while(!qu.empty())
+    {
+        size=qu.size();
+        while(size--)
+        {
+            front=qu.front();
+            qu.pop();
+            for(int i:kPhase2Moves)
+            {
+                coor=epmoves(front,cb,i);
+                coor=coor*24+slicePermMove[front%24][i];
+                if(udEdgeSliceTable[coor]==255)
+                {
+                    udEdgeSliceTable[coor]=level+1;
+                    qu.push(coor);
+                }
+            }
+        }
+        level++;
+    }
+    size_t unvisited = 0;
+
+    for (uint8_t v : udEdgeSliceTable)
+    {
+        if (v == 255)
+            unvisited++;
+    }
+
+    std::cout << "Unvisited states: " << unvisited << '\n';
+    std::cout << "Visited states: "
+          << udEdgeSliceTable.size() - unvisited << '\n';
+    std::cout<<"the max level ud edge p slice is "<<(int)(level-1)<<" which ended at "<<udEdgeSliceTable.size()<<"\n";
+}
+#pragma once
+#include <queue>
+#include "../inputproc/cubie.hpp"
+class Bfs
+{ 
+    public:
+        uint16_t sliceMove[495][18];
+        uint8_t slicePermMove[24][18];
+        int comoves(int crdnt , Cubieste& cb,int mv);
+        int slicemoves(int mv,Cubieste& cb,int slice);
+        int eomoves(int crdnt , Cubieste& cb,int mv);
+        int cpmoves(int crdnt, Cubieste& cb, int mv);
+        int epmoves(int crdnt, Cubieste& cb, int mv);
+        int slicemoves2(int mv,Cubieste& cb,int slice);
+        void bfstwstsls(std::vector<uint8_t>& twistSliceTable);
+        void bfsflpsls(std::vector<uint8_t>& flipSliceTable);
+        void bfscpsls(std::vector<uint8_t>& cpSliceTable);
+        void bfsepsls(std::vector<uint8_t>& udEdgeSliceTable);
+};
+
+#include <array>
+#include <cstdint>
+#include <iostream>
+#include <cstdlib>
+#include "encoder.hpp"
+#include <stdexcept>
+
+uint16_t Encoder::lehmer8coder(const uint8_t* cp)
+{
+    uint16_t idx = 0;
+
+    int c0 = (cp[1] < cp[0]) +
+             (cp[2] < cp[0]) +
+             (cp[3] < cp[0]) +
+             (cp[4] < cp[0]) +
+             (cp[5] < cp[0]) +
+             (cp[6] < cp[0]) +
+             (cp[7] < cp[0]);
+
+    int c1 = (cp[2] < cp[1]) +
+             (cp[3] < cp[1]) +
+             (cp[4] < cp[1]) +
+             (cp[5] < cp[1]) +
+             (cp[6] < cp[1]) +
+             (cp[7] < cp[1]);
+
+    int c2 = (cp[3] < cp[2]) +
+             (cp[4] < cp[2]) +
+             (cp[5] < cp[2]) +
+             (cp[6] < cp[2]) +
+             (cp[7] < cp[2]);
+
+    int c3 = (cp[4] < cp[3]) +
+             (cp[5] < cp[3]) +
+             (cp[6] < cp[3]) +
+             (cp[7] < cp[3]);
+
+    int c4 = (cp[5] < cp[4]) +
+             (cp[6] < cp[4]) +
+             (cp[7] < cp[4]);
+
+    int c5 = (cp[6] < cp[5]) +
+             (cp[7] < cp[5]);
+
+    int c6 = cp[7] < cp[6];
+    return (c0 * 5040 +
+           c1 * 720  +
+           c2 * 120  +
+           c3 * 24   +
+           c4 * 6    +
+           c5 * 2    +
+           c6);
+}
+uint16_t Encoder::encodeCO(const uint8_t* co)
+{
+    uint16_t index = 0;
+
+    for (int i = 0; i < 7; ++i)
+        index = index * 3 + co[i];
+
+    return index;
+}
+uint16_t Encoder::encodeEO(const uint8_t* eo)
+{
+    uint16_t index = 0;
+    for (int i = 0; i < 11; ++i)
+        index = (index << 1) | eo[i];
+
+    return index;
+}
+int C(int n, int k)
+{
+    if (k < 0|| k > n)
+        return 0;
+    if (k == 0 || k == n)
+        return 1;
+    if (k > n/2)
+        k = n - k;
+    
+    int res = 1;
+    for(int i=0;i<k;i++)
+        res = res * (n - i)/(i + 1);
+    return res;
+}
+uint16_t Encoder::encodeSlice(const uint8_t* ep)
+{
+    int pos[4];
+    int k = 0;
+
+    for (int i = 0; i < 12; ++i)
+    {
+        if (ep[i] >= 8)
+        {
+            if (k >= 4)
+            {
+                std::cerr << "ERROR: more than 4 slice edges!\n";
+
+                for (int j = 0; j < 12; ++j)
+                    std::cerr << static_cast<int>(ep[j]) << ' ';
+
+                std::cerr << '\n';
+
+                std::abort();
+            }
+
+            pos[k++] = i;
+        }
+    }
+
+    if (k != 4)
+    {
+        std::cerr << "ERROR: expected 4 slice edges, got "
+                  << k << '\n';
+
+        std::abort();
+    }
+
+    return static_cast<uint16_t>(
+        C(pos[0], 1) +
+        C(pos[1], 2) +
+        C(pos[2], 3) +
+        C(pos[3], 4)
+    );
+}
+uint8_t Encoder::lehmer4(const uint8_t* p)
+{
+    int c0 = (p[1] < p[0]) +
+             (p[2] < p[0]) +
+             (p[3] < p[0]);
+
+    int c1 = (p[2] < p[1]) +
+             (p[3] < p[1]);
+
+    int c2 = (p[3] < p[2]);
+
+    return uint8_t(c0 * 6 +
+           c1 * 2 +
+           c2);
+}
+
+
+void Encoder::decodeCO(uint16_t index, uint8_t* co)
+{
+    int sum = 0;
+
+    for (int i = 6; i >= 0; --i)
+    {
+        co[i] = index % 3;
+        index /= 3;
+
+        sum += co[i];
+    }
+
+    co[7] = (3 - (sum % 3)) % 3;
+}
+
+void Encoder::decodeEO(uint16_t index, uint8_t* eo)
+{
+    int sum = 0;
+
+    for (int i = 10; i >= 0; --i)
+    {
+        eo[i] = index % 2;
+        index /= 2;
+
+        sum += eo[i];
+    }
+
+    eo[11] = sum % 2;
+}
+void Encoder::decodeSlice(uint16_t index, uint8_t* ep)
+{
+    int positions[4];
+
+    int upper = 11;
+
+    // Inverse of:
+    // C(pos[0],1) + C(pos[1],2) + C(pos[2],3) + C(pos[3],4)
+
+    for (int k = 4; k >= 1; --k)
+    {
+        int p = upper;
+
+        while (p >= 0 && C(p, k) > index)
+        {
+            --p;
+        }
+
+        positions[k - 1] = p;
+        index -= C(p, k);
+
+        upper = p - 1;
+    }
+
+    // Fill the edge permutation.
+    // 0..7  = non-slice edges
+    // 8..11 = slice edges
+
+    uint8_t nextNonSlice = 0;
+    uint8_t nextSlice = 8;
+
+    for (int pos = 0; pos < 12; ++pos)
+    {
+        bool isSlice = false;
+
+        for (int k = 0; k < 4; ++k)
+        {
+            if (positions[k] == pos)
+            {
+                isSlice = true;
+                break;
+            }
+        }
+
+        if (isSlice)
+        {
+            ep[pos] = nextSlice++;
+        }
+        else
+        {
+            ep[pos] = nextNonSlice++;
+        }
+    }
+}
+namespace
+{
+    constexpr int factorial(int n)
+    {
+        return n <= 1 ? 1 : n * factorial(n - 1);
+    }
+
+    // Inverse of the Lehmer-code encoding used by lehmer8coder/lehmer4:
+    // index = d0*(N-1)! + d1*(N-2)! + ... + d(N-2)*1!
+    // where each d_i is the rank of out[i] among the values not yet used.
+    //
+    // Memory safety: `remaining` is a fixed-size std::array<uint8_t,N> with
+    // N known at compile time. remCount only ever shrinks from N to 1, and
+    // every index used to read/write it (`d`, and the shift loop's `j`,
+    // `j+1`) is bounded by remCount <= N, so no access can leave the array.
+    template <int N>
+    void decodePermutation(uint16_t index, uint8_t* out)
+    {
+        static_assert(N >= 2 && N <= 8, "decodePermutation supports N in [2,8]");
+
+        std::array<uint8_t, N> remaining{};
+        for (int i = 0; i < N; ++i)
+            remaining[i] = static_cast<uint8_t>(i);
+
+        int remCount = N;
+        unsigned val = index;
+
+        for (int i = 0; i < N - 1; ++i)
+        {
+            const int weight = factorial(N - 1 - i);
+            int digit = static_cast<int>(val / weight);
+            val %= weight;
+
+            // Defensive clamp: a well-formed index never needs this, but it
+            // guarantees remaining[d] can never be read out of bounds even
+            // if a corrupted/truncated coordinate is passed in.
+            if (digit >= remCount)
+                digit = remCount - 1;
+
+            out[i] = remaining[digit];
+
+            for (int j = digit; j < remCount - 1; ++j)
+                remaining[j] = remaining[j + 1];
+
+            --remCount;
+        }
+
+        // One candidate left; it's forced.
+        out[N - 1] = remaining[0];
+    }
+}
+
+void Encoder::decodeLehmer8(uint16_t index, uint8_t* p)
+{
+    constexpr uint16_t kPermCount = 40320; // 8!
+    if (p == nullptr)
+        throw std::invalid_argument("Encoder::decodeLehmer8: p is null");
+
+    if (index >= kPermCount)
+        throw std::out_of_range(
+            "Encoder::decodeLehmer8: index " + std::to_string(index) +
+            " out of range [0, 40320)");
+
+    decodePermutation<8>(index, p);
+}
+
+void Encoder::decodeLehmer4(uint16_t index, uint8_t* p)
+{
+    constexpr uint16_t kPermCount = 24; // 4!
+
+    if (p == nullptr)
+        throw std::invalid_argument("Encoder::decodeLehmer4: p is null");
+
+    if (index >= kPermCount)
+        throw std::out_of_range(
+            "Encoder::decodeLehmer4: index " + std::to_string(index) +
+            " out of range [0, 24)");
+
+    decodePermutation<4>(index, p);
+}#ifndef ENCODER
+#define ENCODER
+
+#include <array>
+#include <cstdint>
+
+class Encoder
+{
+    public:
+         uint16_t lehmer8coder(const uint8_t* cp);
+         uint16_t encodeCO(const uint8_t* co);
+         uint16_t encodeEO(const uint8_t* eo);
+         uint16_t encodeSlice(const uint8_t* ep);
+         uint8_t lehmer4(const uint8_t* p);
+         void decodeCO(uint16_t index, uint8_t* co);
+         void decodeEO(uint16_t index, uint8_t* eo);
+         void decodeSlice(uint16_t index, uint8_t* ep);
+         void decodeLehmer8(uint16_t index, uint8_t* p);
+         void decodeLehmer4(uint16_t index, uint8_t* p);
+};
+#endif // ENCODER
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+#include <vector>
+#include <cstdint>
+
+#include "heuristictable.hpp"
+#include "bfs.hpp"
+#include "encoder.hpp"
+
+namespace Heuristic
+{
+    std::vector<uint8_t> twistSliceTable(TWIST_SLICE_SIZE, UNVISITED);
+    std::vector<uint8_t> flipSliceTable(FLIP_SLICE_SIZE, UNVISITED);
+    std::vector<uint8_t> cpSliceTable(CP_SLICE_SIZE, UNVISITED);
+    std::vector<uint8_t> udEdgeSliceTable(UD_EDGE_SLICE_SIZE, UNVISITED);
+}
+
+
+void Heuristictable::loadTables()
+{
+    loadTable("tables/twist_slice.bin", Heuristic::twistSliceTable);
+    loadTable("tables/flip_slice.bin", Heuristic::flipSliceTable);
+    loadTable("tables/cp_slice.bin", Heuristic::cpSliceTable);
+    loadTable("tables/udedge_slice.bin", Heuristic::udEdgeSliceTable);
+}
+
+
+void Heuristictable::generateTables()
+{
+    // Generate pruning tables
+    std::cout<<"generating tables\n";
+    Bfs bf;
+    bf.bfstwstsls(Heuristic::twistSliceTable);
+    bf.bfsflpsls(Heuristic::flipSliceTable);
+    bf.bfscpsls(Heuristic::cpSliceTable);
+    bf.bfsepsls(Heuristic::udEdgeSliceTable);
+    // TODO:
+    // bf cpslice
+    // bf udedge_slice
+
+    saveTable("tables/twist_slice.bin", Heuristic::twistSliceTable);
+    saveTable("tables/flip_slice.bin", Heuristic::flipSliceTable);
+    saveTable("tables/cp_slice.bin", Heuristic::cpSliceTable);
+    saveTable("tables/udedge_slice.bin", Heuristic::udEdgeSliceTable);
+}
+
+
+void Heuristictable::saveTable(
+    const std::string& filename,
+    const std::vector<uint8_t>& table)
+{
+    std::ofstream out(filename, std::ios::binary);
+
+    if (!out)
+        throw std::runtime_error("Could not open table file for writing: " + filename);
+
+    out.write(
+        reinterpret_cast<const char*>(table.data()),
+        table.size()
+    );
+
+    if (!out)
+        throw std::runtime_error("Error writing table: " + filename);
+}
+
+
+void Heuristictable::loadTable(const std::string& filename, std::vector<uint8_t>& table)
+{
+    std::ifstream in(filename, std::ios::binary);
+
+    if (!in)
+        throw std::runtime_error("Could not open table file for reading: " + filename);
+
+    in.read(
+        reinterpret_cast<char*>(table.data()),
+        table.size()
+    );
+
+    if (!in)
+        throw std::runtime_error("Error reading table: " + filename);
+}
+
+void Heuristictable::load_or_generatetable()
+{
+    namespace fs = std::filesystem;
+
+    const std::string directory = "tables";
+
+    fs::create_directories(directory);
+
+    const bool tablesExist =
+        fs::exists(directory + "/twist_slice.bin") &&
+        fs::exists(directory + "/flip_slice.bin") &&
+        fs::exists(directory + "/cp_slice.bin") &&
+        fs::exists(directory + "/udedge_slice.bin");
+
+    if (tablesExist)
+    {
+        std::cout << "Loading pruning tables...\n";
+
+        loadTables();
+
+        std::cout << "Tables loaded.\n";
+    }
+    else
+    {
+        std::cout << "Pruning tables not found.\n";
+        std::cout << "Generating tables...\n";
+
+        generateTables();
+
+        std::cout << "Tables generated and saved.\n";
+    }
+}#if !defined(HEURISTIC)
+#define HEURISTIC
+#include <vector>
+#include <string>
+#include <cstdint>
+namespace Heuristic
+{
+    constexpr int CO_SIZE    = 2187;   // 3^7
+    constexpr int EO_SIZE    = 2048;   // 2^11
+    constexpr int SLICE_SIZE = 495;    // C(12,4)
+    
+    constexpr int TWIST_SLICE_SIZE = CO_SIZE * SLICE_SIZE;
+    constexpr int FLIP_SLICE_SIZE  = EO_SIZE * SLICE_SIZE;
+    
+    constexpr uint8_t UNVISITED = 255;
+    
+    
+    // Phase 1 pruning tables
+    
+    extern std::vector<uint8_t> twistSliceTable;
+    
+    extern std::vector<uint8_t> flipSliceTable;
+    
+    
+    // Phase 2 coordinate sizes
+    
+    constexpr int CP_SIZE         = 40320; // 8!
+    constexpr int UD_EDGE_SIZE    = 40320; // 8!
+    constexpr int SLICE_PERM_SIZE = 24;    // 4!
+    
+    
+    // Phase 2 coordinate sizes
+    
+    constexpr int CP_SLICE_SIZE = CP_SIZE * SLICE_PERM_SIZE;
+    
+    constexpr int UD_EDGE_SLICE_SIZE = UD_EDGE_SIZE * SLICE_PERM_SIZE;
+    
+    
+    // Phase 2 pruning tables
+    
+    extern std::vector<uint8_t> cpSliceTable;
+    
+    extern std::vector<uint8_t> udEdgeSliceTable;
+}
+class Heuristictable
+{
+    public:
+        void generateTables();
+        void loadTables();
+        void loadTable(const std::string& filename, std::vector<uint8_t>& table);
+        void saveTable(const std::string& filename,const std::vector<uint8_t>& table);
+        void load_or_generatetable();
+};
+#endif // MACRO#ifndef CUBE_H
+#define CUBE_H
+#include <array>
+struct Cube
+{
+    std::array<char, 9> U;
+    std::array<char, 9> F;
+    std::array<char, 9> D;
+    std::array<char, 9> R;
+    std::array<char, 9> L;
+    std::array<char, 9> B;
+};
+#endif#ifndef CUBIE_H
+#define CUBIE_H
+#include <cstdint>
+
+struct Cubieste
+{
+    uint8_t cp[8];
+    uint8_t co[8];
+    uint8_t ep[12];
+    uint8_t eo[12];
+};
+#endif#include <array>
+#include "stk_to_cub.hpp"
+#include "cube.hpp"
+#include "cubie.hpp"
+#include <iostream>
+#include <vector>
+#include <cstdlib>
+enum Face
+{
+    U,F,D,R,L,B
+};
+struct Stickerpos//contains face and index number of that sticker form the iput 
+{
+    Face face;
+    int index;
+};
+struct Corner//contains the total corner table for the input to get converted
+{
+    Stickerpos sticker[3];
+};
+const Corner corner[8] =
+{
+    // UFR
+    {{{U, 8}, {F, 2}, {R,0}}},
+
+    // UFL
+    {{{U, 6}, {F, 0}, {L, 2}}},
+
+    // ULB
+    {{{U, 0}, {L, 0}, {B, 2}}},
+
+    // UBR
+    {{{U, 2}, {B, 0}, {R, 2}}},
+
+    // DFR
+    {{{D, 2}, {F, 8}, {R, 6}}},
+
+    // DFL
+    {{{D, 0}, {F, 6}, {L, 8}}},
+
+    // DLB
+    {{{D, 6}, {L, 6}, {B, 8}}},
+
+    // DRB
+    {{{D, 8}, {R, 8}, {B, 6}}}
+};
+char getsticker(Cube& cube,Stickerpos p)
+{
+    switch(p.face)
+    {
+        case U:return cube.U[p.index];
+        case F:return cube.F[p.index];
+        case D:return cube.D[p.index];
+        case R:return cube.R[p.index];
+        case L:return cube.L[p.index];
+        case B:return cube.B[p.index];
+    }
+    std::cout<<"getsticker success\n";
+    return '?';
+}
+std::array<char,3> getcolourcon(Cube cube,int a)
+{
+    std::cout<<"getcolourcon success\n";
+    return {getsticker(cube,corner[a].sticker[0]),
+            getsticker(cube,corner[a].sticker[1]),
+            getsticker(cube,corner[a].sticker[2])};
+}
+bool samecon(const std::array<char,3> a,const std::array<char,3> b)
+{
+    std::cout<<"samecon success\n";
+    return ((a[0]==b[0]||a[0]==b[1]||a[0]==b[2])
+            &&(a[1]==b[0]||a[1]==b[1]||a[1]==b[2])
+            &&(a[2]==b[0]||a[2]==b[1]||a[2]==b[2]));
+}
+
+int getCO(const std::array<char, 3>& colors, int position)
+{
+    for (int i = 0; i < 3; i++)
+    {
+        if (colors[i] == 'W' || colors[i] == 'Y')
+            return i;   // trust the corner[] table's declared rotational order
+    }
+    return -1;
+}
+
+int getcp(std::array<char,3> colour)
+{
+    for(int i=0;i<8;i++)
+    {
+        if(samecon(colour,cornerTable[i].colors))
+        {
+            std::cout<<"getcp success\n";
+            return i;
+        }
+    }
+    return -1;
+}
+struct Edge
+{
+    Stickerpos sticker[2];
+};
+const Edge edge[12]
+{
+    // UF
+    {{{U, 7}, {F, 1}}},
+
+    // UL
+    {{{U, 3}, {L, 1}}},
+
+    // UB
+    {{{U, 1}, {B, 1}}},
+
+    // UR
+    {{{U, 5}, {R, 1}}},
+
+    // DF
+    {{{D, 1}, {F, 7}}},
+
+    // DL
+    {{{D, 3}, {L, 7}}},
+
+    // DB
+    {{{D, 7}, {B, 7}}},
+
+    // DR
+    {{{D, 5}, {R, 7}}},
+
+    // FL
+    {{{F, 3}, {L, 5}}},
+
+    // LB
+    {{{L, 3}, {B, 5}}},
+
+    // BR
+    {{{B, 3}, {R, 5}}},
+
+    // RF
+    {{{R, 3}, {F, 5}}}
+};
+bool sameedg(const std::array<char,2> a,const std::array<char,2> b)
+{
+    std::cout<<"sameedg success \n";
+    return ((a[0]==b[0]||a[0]==b[1])&&(a[1]==b[0]||a[1]==b[1]));
+}
+std::array<char,2> getcolouredg(Cube cube,int a)
+{
+    std::cout<<"getcolouredg success\n";
+    return {getsticker(cube,edge[a].sticker[0]),
+            getsticker(cube,edge[a].sticker[1]),};
+}
+int getep(std::array<char,2> colour)
+{
+    for(int i=0;i<12;i++)
+    {
+        if(sameedg(colour,edgeTable[i].colors))
+        {
+            std::cout<<"getep success\n";
+            return i;
+        }
+    }
+    return -1;
+}
+bool isUD(char c)
+{
+    return c == 'W' || c == 'Y';
+}
+
+bool isFB(char c)
+{
+    return c == 'G' || c == 'B';
+}
+int geteo(std::array<char,2> colour,int position)
+{
+    Face face1,face2;
+    face1=edge[position].sticker[0].face;
+    face2=edge[position].sticker[1].face;
+    if (isUD(colour[0])){
+        std::cout<<"succesfull eo finding";
+        return (face1 == U || face1 == D) ? 0 : 1;
+    }
+    if (isUD(colour[1])){
+        std::cout<<"succesfull eo finding";
+        return (face2 == U || face2 == D) ? 0 : 1;
+    }
+    // No U/D color => this is one of the middle-layer edges.
+    // Its F/B color determines orientation.
+
+    if (isFB(colour[0])){
+        std::cout<<"succesfull eo finding";
+        return (face1 == F || face1 == B) ? 0 : 1;
+    }
+    if (isFB(colour[1])){
+        std::cout<<"succesfull eo finding";
+        return (face2 == F || face2 == B) ? 0 : 1;
+    }
+    return -1; // impossible
+}
+Cubieste inpproc::cornerinfer(Cube& cube, Cubieste cst)
+{
+    static const char* names[8] = {"UFR","UFL","ULB","UBR","DFR","DFL","DLB","DRB"};
+    for (int i = 0; i < 8; i++)
+    {
+        auto colour = getcolourcon(cube, i);
+        int cp = getcp(colour);
+        if (cp == -1)
+        {
+            std::cerr << "ERROR: corner " << names[i] << " (colors "
+                      << colour[0] << colour[1] << colour[2]
+                      << ") did not match any known corner\n";
+        }
+        cst.cp[i] = static_cast<uint8_t>(cp);
+        cst.co[i] = getCO(colour, i);
+    }
+    return cst;
+}
+Cubieste inpproc::edgeinfer(Cube& cube,Cubieste cst)
+{
+    for(int i=0;i<12;i++)
+    {
+        auto colour=getcolouredg(cube,i);
+        cst.ep[i]=getep(colour);
+        cst.eo[i]=geteo(colour,i);
+    }
+    std::cout<<"edgeinfer success\n";
+    return cst;
+}
+bool inpproc::inpvald(const uint8_t* p,int n)
+{
+    std::vector<bool> visited(n,false);
+    int j=0,cycles=0;
+    for(int i=0;i<n;i++)
+    {
+        if(!visited[i])
+        {
+            cycles++;
+            j=i;
+            while(!visited[j])
+            {
+                visited[j]=true;
+                j=p[j];
+            }
+        }
+    }
+    return (n-cycles)%2;
+}#ifndef STICKER_HPP
+#define STICKER_HPP
+#include <array>
+#include "cube.hpp"
+#include "cubie.hpp"
+
+struct CornerInfo
+{
+    const char* name;
+    std::array<char, 3> colors;
+};
+struct EdgeInfo
+{
+    const char* name;
+    std::array<char, 2> colors;
+};
+
+const CornerInfo cornerTable[8] =
+{
+    {"UFR", {'W', 'G', 'R'}},
+    {"UFL", {'W', 'G', 'O'}},
+    {"ULB", {'W', 'O', 'B'}},
+    {"UBR", {'W', 'B', 'R'}},
+
+    {"DFR", {'Y', 'G', 'R'}},
+    {"DFL", {'Y', 'G', 'O'}},
+    {"DLB", {'Y', 'O', 'B'}},
+    {"DRB", {'Y', 'R', 'B'}}
+};
+
+const EdgeInfo edgeTable[12] =
+{
+    {"UF", {'W', 'G'}},
+    {"UL", {'W', 'O'}},
+    {"UB", {'W', 'B'}},
+    {"UR", {'W', 'R'}},
+
+    {"DF", {'Y', 'G'}},
+    {"DL", {'Y', 'O'}},
+    {"DB", {'Y', 'B'}},
+    {"DR", {'Y', 'R'}},
+
+    {"FL", {'G', 'O'}},
+    {"LB", {'O', 'B'}},
+    {"BR", {'B', 'R'}},
+    {"RF", {'R', 'G'}}
+};
+
+class inpproc
+{
+    public:
+        Cubieste cornerinfer(Cube& cube,Cubieste cb);
+        Cubieste edgeinfer(Cube& cube,Cubieste cb);
+    public:
+        bool inpvald(const uint8_t* p,int n);
+};
+#endif
+#include "../inputproc/cubie.hpp"
+#include <vector>
+#include "DFS2.hpp"
+#include "kociemba_ph1.hpp"
+#include "../bfstable/bfs.hpp"
+#include "../bfstable/encoder.hpp"
+#include "../bfstable/heuristictable.hpp"
+#include "../rubicsmove/cubemove.hpp"
+#include "DFS.hpp"
+#include <iostream>
+#include <chrono>
+
+namespace
+{
+    int cp_sls_crdnt(Cubieste cb)
+    {
+        Encoder ec;
+        int cdcp=ec.lehmer8coder(cb.cp);
+        int cdsl2=ec.lehmer4(&cb.ep[8]);
+        int crdnt=cdcp*24+cdsl2;
+        return crdnt;
+    }
+    int udEdge_sls_crdnt(Cubieste cb)
+    {
+        Encoder ec;
+        int cdep=ec.lehmer8coder(cb.ep);
+        int cdsl2=ec.lehmer4(&cb.ep[8]);
+        int crdnt=cdep*24+cdsl2;
+        return crdnt;
+    }
+}
+
+int Dfs2::cost_f_n2(Cubieste cb)
+{
+    int crdnt1=Heuristic::cpSliceTable[cp_sls_crdnt(cb)];
+    int crdnt2=Heuristic::udEdgeSliceTable[udEdge_sls_crdnt(cb)];
+    return std::max(crdnt1,crdnt2);
+}
+
+bool Dfs2::kociembaPhase2(Cubieste cb)
+{
+    int h = cost_f_n2(cb);
+
+    while (true)
+    {
+        auto start = std::chrono::steady_clock::now();
+
+        int result = dFs2(cb, 0, h, -1);
+
+        auto end = std::chrono::steady_clock::now();
+
+        std::chrono::duration<double> elapsed = end - start;
+
+        std::cout << "Phase 2 bound " << h
+                  << " completed"
+                  << " | next bound = " << result
+                  << " | time = " << elapsed.count()
+                  << " seconds\n";
+
+        if (result == -1)
+        {
+            return true;
+        }
+
+        h = result;
+    }
+
+    return false;
+}
+
+int Dfs2::dFs2(const Cubieste& cb,int g,int bound,int lastmv)
+{
+    Dfs2 kp2;
+    KociembaPhase1 kp1;
+    int h=kp2.cost_f_n2(cb);
+    int f=g+h;
+    if(f>bound)
+        return f;
+    if(kp1.soln_chkr(cb))
+    {
+        return -1;
+    }
+    Cubieste next;
+    int minin=255;
+    Moves mov;
+    for(int i:moves2::kPhase2Moves)
+    {
+        if(redundancy_chk::redun_dnt(lastmv,i))
+            continue;
+
+        next=cb;
+        next=mov.applyMove(next,i);
+        solution_sets::solution2.push_back(i);
+        int result=dFs2(next,g+1,bound,i);
+        if(result==-1)
+            return -1;
+        
+        minin=std::min(minin,result);
+        solution_sets::solution2.pop_back();
+        
+    }
+    return minin;
+}
+#ifndef DFS2
+#define DFS2
+#include "../inputproc/cubie.hpp"
+#include <vector>
+
+namespace moves2
+{
+    constexpr int kPhase2Moves[10] = { 0, 1, 2, 4, 7, 10, 13, 15, 16, 17 };   // U, U2, U', F2, B2, L2, R2, D, D2, D'
+}
+
+class Dfs2
+{
+    public:
+        bool kociembaPhase2(Cubieste cb);
+        int dFs2(const Cubieste& cb,int g,int bound,int lastmv);
+        int cost_f_n2(Cubieste cb);
+};
+
+#endif 
+#include "../inputproc/cubie.hpp"
+#include <vector>
+#include "DFS.hpp"
+#include "kociemba_ph1.hpp"
+#include "DFS2.hpp"
+#include "../rubicsmove/cubemove.hpp"
+#include <algorithm>
+#include <iostream>
+
+
+int Dfs::dFs1(const Cubieste& cb,int g,int bound,int lastmv)
+{
+    KociembaPhase1 kp1;
+    int h=kp1.cost_f_n1(cb);
+    int f=g+h;
+    if(f>bound)
+        return f;
+    if(kp1.kociembaG1_sb_grp_chkr(cb))
+    {
+        Dfs2 df2;
+        if(df2.kociembaPhase2(cb))
+        {
+            return -1;
+        }
+    }
+    Cubieste next;
+    int minin=255;
+    Moves mov;
+    for(int i=0;i<18;i++)
+    {
+        if(redundancy_chk::redun_dnt(lastmv,i))
+            continue;
+
+        next=cb;
+        next=mov.applyMove(next,i);
+        solution_sets::solution1.push_back(i);
+        int result=dFs1(next,g+1,bound,i);
+        if(result==-1)
+            return -1;
+        
+        minin=std::min(minin,result);
+        solution_sets::solution1.pop_back();
+    }
+    return minin;
+}#ifndef DFS
+#define DFS
+#include "../inputproc/cubie.hpp"
+#include <vector>
+
+namespace redundancy_chk
+{
+    inline bool redun_dnt(int lastmv,int mv)
+    {
+        if(lastmv/3==mv/3)
+            return true;
+        return false;
+    }
+}
+
+class Dfs
+{
+    public:
+        int dFs1(const Cubieste& cb,int g,int bound,int lastmv);
+};
+
+#endif #include "../inputproc/cubie.hpp"
+#include "kociemba_ph1.hpp"
+#include "../bfstable/bfs.hpp"
+#include "../bfstable/encoder.hpp"
+#include <algorithm>
+#include "DFS.hpp"
+#include "../bfstable/heuristictable.hpp"
+#include <iostream>
+#include <chrono>
+
+// add near the top of kociemba_ph1.cpp, outside any function
+namespace solution_sets
+{
+    std::vector<int> solution1;
+    std::vector<int> solution2;
+}
+
+
+namespace
+{
+    int twist_sls_crdnt(Cubieste& cb)
+    {
+        Encoder ec;
+        int cdco=ec.encodeCO(cb.co);
+        int cdsl=ec.encodeSlice(cb.ep);
+        int crdnt=cdco*495+cdsl;
+        return crdnt;
+    }
+    int flip_sls_crdnt(Cubieste& cb)
+    {
+        Encoder ec;
+        int cdeo=ec.encodeEO(cb.eo);
+        int cdsl=ec.encodeSlice(cb.ep);
+        int crdnt=cdeo*495+cdsl;
+        return crdnt;
+    }
+}
+
+int KociembaPhase1::cost_f_n1(Cubieste cb)
+{
+    int crdnt1=Heuristic::twistSliceTable[twist_sls_crdnt(cb)];
+    int crdnt2=Heuristic::flipSliceTable[flip_sls_crdnt(cb)];
+    return std::max(crdnt1,crdnt2);
+}
+
+bool KociembaPhase1::kociembaG1_sb_grp_chkr(Cubieste cb)
+{
+    for(int i=0;i<8;i++)
+    {
+        if(cb.co[i]!=0)
+        {
+            return false;
+        }
+    }
+    for(int i=0;i<12;i++)
+    {
+        if(cb.eo[i]!=0)
+            return false;
+    }
+    for(int i=0;i<8;i++)
+    {
+        if(cb.ep[i]>=8)
+            return false;
+    }
+    return true;
+}
+bool KociembaPhase1::soln_chkr(Cubieste cb)
+{
+    for(int i=0;i<8;i++)
+    {
+        if(cb.cp[i]!=i||cb.co[i]!=0)
+        return false;
+    }
+    for(int i=0;i<12;i++)
+    {
+        if(cb.ep[i]!=i||cb.eo[i]!=0)
+        return false;
+    }
+    return true;
+}
+
+bool KociembaPhase1::kociembaPhase1(Cubieste& cb)
+{
+    int h = cost_f_n1(cb);
+    Dfs df;
+
+    while (true)
+    {
+        auto start = std::chrono::steady_clock::now();
+
+        int result = df.dFs1(cb, 0, h, -1);
+
+        auto end = std::chrono::steady_clock::now();
+
+        auto elapsed =
+            std::chrono::duration_cast<std::chrono::milliseconds>
+            (end - start);
+
+        std::cout << "One level is explored in phase 1. "
+                  << "Bound: " << h
+                  << " | Next bound: " << result
+                  << " | Time: " << elapsed.count()
+                  << " ms\n";
+
+        if (result == -1)
+        {
+            return true;
+        }
+
+        h = result;
+    }
+
+    return false;
+}#ifndef KOCIEMBA1
+#define KOCIEMBA1
+#include "../inputproc/cubie.hpp"
+#include <vector>
+
+namespace solution_sets
+{
+    extern std::vector<int> solution1;
+    extern std::vector<int> solution2;
+}
+
+class KociembaPhase1
+{
+    public:
+        bool kociembaG1_sb_grp_chkr(Cubieste cb);
+        bool kociembaPhase1(Cubieste& cb);
+        bool soln_chkr(Cubieste cb);
+        int cost_f_n1(Cubieste cb);
+};
+
+#endif#include "inputproc/cube.hpp"
+#include "inputproc/stk_to_cub.hpp"
+#include <bits/stdc++.h>
+#include "inputproc/cubie.hpp"
+#include "bfstable/heuristictable.hpp"
+#include "bfstable/encoder.hpp"
+#include "kociemba/kociemba_ph1.hpp"
+#include "rubicsmove/cubemove.hpp"
+
+using namespace std;
+
+class tsmltoseg
+{
+    public:
+    array<char, 9> input()
+    {
+        array<char, 9> face;
+
+        for(int i = 0; i < 9; i++)
+            cin >> face[i];
+
+        std::cout<<"input of face success";
+        return face;
+    }
+    Cube usrinp()
+    {
+        Cube cub;
+        std::cout<<"enter the sticker colour on the side which has center white as W,G,Y,R,O,B and white must be up wards with green front and red right and so on fro the respective centers\n";
+        cub.U=input();
+        std::cout<<"enter the sticker colour on the side which has center green as W,G,Y,R,O,B and green must be up wards with yellow front and red right and so on for the respective centers\n";
+        cub.F=input();
+        std::cout<<"enter the sticker colour on the side which has center yello as W,G,Y,R,O,B and yello must be up wards with blue front and red right and so on for the respective centers\n";
+        cub.D=input();
+        std::cout<<"enter the sticker colour on the side which has center red as W,G,Y,R,O,B and red must be up wards with yello front and blue right and so on for the respective centers\n";
+        cub.R=input();
+        std::cout<<"enter the sticker colour on the side which has center orange as W,G,Y,R,O,B and orange must be up wards with yello front and right green and so on for the respective centers\n";
+        cub.L=input();
+        std::cout<<"enter the sticker colour on the side which has center blue as W,G,Y,R,O,B and blue must be up wards with yello front and orange right and so on for the respective centers\n";
+        cub.B=input(); 
+        std::cout<<"input success\n";
+        return cub;
+    }
+    std::string movesToNotation(const std::vector<int>& moves)
+    {
+        static const std::string notation[18] =
+        {
+            "U",  "U2",  "U'",
+            "F",  "F2", "F'",
+            "B",  "B2", "B'",
+            "L",  "L2", "L'",
+            "R",  "R2", "R'",
+            "D",  "D2", "D'"
+        };
+    
+        std::string result;
+    
+        for (int mv : moves)
+        {
+            if (mv < 0 || mv >= 18)
+                continue;   // or throw an error
+        
+            if (!result.empty())
+                result += ' ';
+        
+            result += notation[mv];
+        }
+    
+        return result;
+    }
+};
+
+
+int main()
+{
+    Cube cub;
+    tsmltoseg ob;
+    cout<<R"(           |************|
+             |*U1**U2**U3*|
+             |************|
+             |*U4**Wh**U6*|
+             |************|
+             |*U7**U8**U9*|
+             |************|
+ ************|************|************|************
+ *L1**L2**L3*|*F1**F2**F3*|*R1**R2**R3*|*B1**B2**B3*
+ ************|************|************|************
+ *L4**Or**L6*|*F4**Gr**F6*|*R4**Re**R6*|*B4**Bl**B6*
+ ************|************|************|************
+ *L7**L8**L9*|*F7**F8**F9*|*R7**R8**R9*|*B7**B8**B9*
+ ************|************|************|************
+             |************|
+             |*D1**D2**D3*|
+             |************|
+             |*D4**Ye**D6*|
+             |************|
+             |*D7**D8**D9*|
+             |************|)"<<"\n";
+    cout<<"here Wh= white(U5), Gr=green(F5), Ye=yellow(Y5), Re=red(R5), Bl=blue(B5), Or=orange(O5)\n"<<"\n";
+    cub=ob.usrinp();
+    inpproc ip;
+    Cubieste cb;
+    cb=ip.cornerinfer(cub,cb);
+    cb=ip.edgeinfer(cub,cb);
+    std::cout <<"the cp and co are";
+    for(int i=0;i<8;i++)
+    {
+        std::cout<<static_cast<int>(cb.cp[i])<<"   "<<static_cast<int>(cb.co[i])<<"\n";
+    }
+    std::cout<< "the ep and eo are";
+    for(int i=0;i<12;i++)
+    {
+        std::cout<<static_cast<int>(cb.ep[i])<<"   "<<static_cast<int>(cb.eo[i])<<"\n";
+    }
+
+    int vald1=ip.inpvald(cb.cp,8);
+    int vald2=ip.inpvald(cb.ep,12);
+    int sum=0;
+    for(int i=0;i<8;i++)
+    {
+        sum+=cb.co[i];
+    }
+    int cosas=sum%3;
+    sum=0;
+    for(int i=0;i<12;i++)
+    {
+        sum+=cb.eo[i];
+    }
+    int eosas=sum%2;
+    
+    if(vald1!=vald2)
+    {
+        cout<<"there are cycles in ur input\n"; 
+    }
+    if(eosas!=0)
+    {
+        cout<<"the edge orientations are wrong\n";
+    }
+    if(cosas!=0)
+    {
+        cout<<"the corner orientations are wrong\n";
+    }
+    if(vald1!=vald2||cosas!=0||eosas!=0)
+    {
+        std::cout<<"the input is wrong pls enter correct input\n";
+        return 0;
+    }
+    KociembaPhase1 kp1;
+    if(kp1.soln_chkr(cb))
+    {
+        cout<<"it is already solved nigger what do u want are u dumb??\n";
+        return 0;
+    }
+    Heuristictable ht;
+    ht.load_or_generatetable();
+    string solutionstr1=ob.movesToNotation(solution_sets::solution1);
+    string solutionstr2=ob.movesToNotation(solution_sets::solution2);
+    if(kp1.kociembaPhase1(cb))
+    {
+        cout<<"the solution steps in first phase are:- "<<solutionstr1<<"in the second phase:- "<<solutionstr2<<"\n";
+    }
+    
+    return 0;
+}#include "../inputproc/cubie.hpp"
+#include "cubemove.hpp"
+
+
+// ============================================================
+// U
+// ============================================================
+
+Cubieste Moves::U(const Cubieste& cube)
+{
+    Cubieste result = cube;
+
+    // Corners
+    result.cp[0] = cube.cp[3];
+    result.cp[1] = cube.cp[0];
+    result.cp[2] = cube.cp[1];
+    result.cp[3] = cube.cp[2];
+
+    result.co[0] = cube.co[3];
+    result.co[1] = cube.co[0];
+    result.co[2] = cube.co[1];
+    result.co[3] = cube.co[2];
+
+    // Edges
+    result.ep[0] = cube.ep[3];
+    result.ep[1] = cube.ep[0];
+    result.ep[2] = cube.ep[1];
+    result.ep[3] = cube.ep[2];
+
+    result.eo[0] = cube.eo[3];
+    result.eo[1] = cube.eo[0];
+    result.eo[2] = cube.eo[1];
+    result.eo[3] = cube.eo[2];
+
+    return result;
+}
+
+
+// ============================================================
+// U'
+// ============================================================
+
+Cubieste Moves::U_PRIME(const Cubieste& cube)
+{
+    return U2(U(cube));
+}
+
+
+// ============================================================
+// U2
+// ============================================================
+
+Cubieste Moves::U2(const Cubieste& cube)
+{
+    return U(U(cube));
+}
+
+
+// ============================================================
+// D
+// ============================================================
+
+Cubieste Moves::D(const Cubieste& cube)
+{
+    Cubieste result = cube;
+
+    // Corners
+    result.cp[4] = cube.cp[5];
+    result.cp[5] = cube.cp[6];
+    result.cp[6] = cube.cp[7];
+    result.cp[7] = cube.cp[4];
+
+    result.co[4] = cube.co[5];
+    result.co[5] = cube.co[6];
+    result.co[6] = cube.co[7];
+    result.co[7] = cube.co[4];
+
+    // Edges
+    result.ep[4] = cube.ep[5];
+    result.ep[5] = cube.ep[6];
+    result.ep[6] = cube.ep[7];
+    result.ep[7] = cube.ep[4];
+
+    result.eo[4] = cube.eo[5];
+    result.eo[5] = cube.eo[6];
+    result.eo[6] = cube.eo[7];
+    result.eo[7] = cube.eo[4];
+
+    return result;
+}
+
+
+// ============================================================
+// D'
+// ============================================================
+
+Cubieste Moves::D_PRIME(const Cubieste& cube)
+{
+    return D2(D(cube));
+}
+
+
+// ============================================================
+// D2
+// ============================================================
+
+Cubieste Moves::D2(const Cubieste& cube)
+{
+    return D(D(cube));
+}
+
+
+// ============================================================
+// R
+// ============================================================
+
+Cubieste Moves::R(const Cubieste& cube)
+{
+    Cubieste result = cube;
+
+    // Corners (unchanged — already a correct 4-cycle)
+    result.cp[0] = cube.cp[4];
+    result.cp[3] = cube.cp[0];
+    result.cp[7] = cube.cp[3];
+    result.cp[4] = cube.cp[7];
+
+    result.co[0] = (cube.co[4] + 2) % 3;
+    result.co[3] = (cube.co[0] + 1) % 3;
+    result.co[7] = (cube.co[3] + 2) % 3;
+    result.co[4] = (cube.co[7] + 1) % 3;
+
+    // Edges — fixed to a proper 4-cycle: UR -> RF -> BR -> DR -> UR
+    result.ep[3]  = cube.ep[11]; // UR <- RF
+    result.ep[11] = cube.ep[10]; // RF <- BR
+    result.ep[10] = cube.ep[7];  // BR <- DR
+    result.ep[7]  = cube.ep[3];  // DR <- UR
+
+    result.eo[3]  = cube.eo[11];
+    result.eo[11] = cube.eo[10];
+    result.eo[10] = cube.eo[7];
+    result.eo[7]  = cube.eo[3];
+
+    return result;
+}
+
+
+// ============================================================
+// R'
+// ============================================================
+
+Cubieste Moves::R_PRIME(const Cubieste& cube)
+{
+    return R2(R(cube));
+}
+
+
+// ============================================================
+// R2
+// ============================================================
+
+Cubieste Moves::R2(const Cubieste& cube)
+{
+    return R(R(cube));
+}
+
+
+// ============================================================
+// L
+// ============================================================
+
+Cubieste Moves::L(const Cubieste& cube)
+{
+    Cubieste result = cube;
+
+    // Corners
+    result.cp[1] = cube.cp[2];
+    result.cp[2] = cube.cp[6];
+    result.cp[5] = cube.cp[1];
+    result.cp[6] = cube.cp[5];
+
+    // Corner orientation
+    result.co[1] = (cube.co[2] + 1) % 3;
+    result.co[2] = (cube.co[6] + 2) % 3;
+    result.co[5] = (cube.co[1] + 2) % 3;
+    result.co[6] = (cube.co[5] + 1) % 3;
+
+    // Edges
+    result.ep[1] = cube.ep[9]; // UL <- LB
+    result.ep[5] = cube.ep[8]; // DL <- FL
+    result.ep[8] = cube.ep[1]; // FL <- UL
+    result.ep[9] = cube.ep[5]; // LB <- DL
+
+    result.eo[1] = cube.eo[9];
+    result.eo[5] = cube.eo[8];
+    result.eo[8] = cube.eo[1];
+    result.eo[9] = cube.eo[5];
+
+    return result;
+}
+
+
+// ============================================================
+// L'
+// ============================================================
+
+Cubieste Moves::L_PRIME(const Cubieste& cube)
+{
+    return L2(L(cube));
+}
+
+
+// ============================================================
+// L2
+// ============================================================
+
+Cubieste Moves::L2(const Cubieste& cube)
+{
+    return L(L(cube));
+}
+
+
+// ============================================================
+// F
+// ============================================================
+
+Cubieste Moves::F(const Cubieste& cube)
+{
+    Cubieste result = cube;
+
+    // Corners (unchanged — already a correct 4-cycle)
+    result.cp[0] = cube.cp[1];
+    result.cp[1] = cube.cp[5];
+    result.cp[4] = cube.cp[0];
+    result.cp[5] = cube.cp[4];
+
+    result.co[0] = (cube.co[1] + 1) % 3;
+    result.co[1] = (cube.co[5] + 2) % 3;
+    result.co[4] = (cube.co[0] + 2) % 3;
+    result.co[5] = (cube.co[4] + 1) % 3;
+
+    // Edges — fixed to a proper 4-cycle: UF -> FL -> DF -> RF -> UF
+    result.ep[0]  = cube.ep[8];   // UF <- FL
+    result.ep[8]  = cube.ep[4];   // FL <- DF
+    result.ep[4]  = cube.ep[11];  // DF <- RF
+    result.ep[11] = cube.ep[0];   // RF <- UF
+
+    result.eo[0]  = cube.eo[8]  ^ 1;
+    result.eo[8]  = cube.eo[4]  ^ 1;
+    result.eo[4]  = cube.eo[11] ^ 1;
+    result.eo[11] = cube.eo[0]  ^ 1;
+
+    return result;
+}
+
+
+// ============================================================
+// F'
+// ============================================================
+
+Cubieste Moves::F_PRIME(const Cubieste& cube)
+{
+    return F2(F(cube));
+}
+
+
+// ============================================================
+// F2
+// ============================================================
+
+Cubieste Moves::F2(const Cubieste& cube)
+{
+    return F(F(cube));
+}
+
+
+// ============================================================
+// B
+// ============================================================
+
+Cubieste Moves::B(const Cubieste& cube)
+{
+    Cubieste result = cube;
+
+    // Corners
+    result.cp[2] = cube.cp[3];
+    result.cp[3] = cube.cp[7];
+    result.cp[6] = cube.cp[2];
+    result.cp[7] = cube.cp[6];
+
+    // Corner orientation
+    result.co[2] = (cube.co[3] + 1) % 3;
+    result.co[3] = (cube.co[7] + 2) % 3;
+    result.co[6] = (cube.co[2] + 2) % 3;
+    result.co[7] = (cube.co[6] + 1) % 3;
+
+    // Edges
+    result.ep[2]  = cube.ep[10]; // UB <- BR
+    result.ep[6]  = cube.ep[9];  // DB <- LB
+    result.ep[9]  = cube.ep[2];  // LB <- UB
+    result.ep[10] = cube.ep[6];  // BR <- DB
+
+    // B flips these four edges
+    result.eo[2]  = cube.eo[10] ^ 1;
+    result.eo[6]  = cube.eo[9]  ^ 1;
+    result.eo[9]  = cube.eo[2]  ^ 1;
+    result.eo[10] = cube.eo[6]  ^ 1;
+
+    return result;
+}
+
+
+// ============================================================
+// B'
+// ============================================================
+
+Cubieste Moves::B_PRIME(const Cubieste& cube)
+{
+    return B2(B(cube));
+}
+
+
+// ============================================================
+// B2
+// ============================================================
+
+Cubieste Moves::B2(const Cubieste& cube)
+{
+    return B(B(cube));
+}
+
+Cubieste Moves::applyMove(const Cubieste& cube, int mv)
+{
+    switch(mv)
+    {
+        case 0:  return U(cube);
+        case 1:  return U2(cube);
+        case 2:  return U_PRIME(cube);
+
+        case 3:  return F(cube);
+        case 4:  return F2(cube);
+        case 5:  return F_PRIME(cube);
+
+        case 6:  return B(cube);
+        case 7:  return B2(cube);
+        case 8:  return B_PRIME(cube);
+
+        case 9:  return L(cube);
+        case 10: return L2(cube);
+        case 11: return L_PRIME(cube);
+
+        case 12: return R(cube);
+        case 13: return R2(cube);
+        case 14: return R_PRIME(cube);
+
+        case 15: return D(cube);
+        case 16: return D2(cube);
+        case 17: return D_PRIME(cube);
+    }
+    return cube; // invalid index, should never happen
+}#pragma once
+
+#include "../inputproc/cubie.hpp"
+
+class Moves
+{
+public:
+
+    static Cubieste U(const Cubieste& cube);
+    static Cubieste U_PRIME(const Cubieste& cube);
+    static Cubieste U2(const Cubieste& cube);
+
+    static Cubieste D(const Cubieste& cube);
+    static Cubieste D_PRIME(const Cubieste& cube);
+    static Cubieste D2(const Cubieste& cube);
+
+    static Cubieste L(const Cubieste& cube);
+    static Cubieste L_PRIME(const Cubieste& cube);
+    static Cubieste L2(const Cubieste& cube);
+
+    static Cubieste R(const Cubieste& cube);
+    static Cubieste R_PRIME(const Cubieste& cube);
+    static Cubieste R2(const Cubieste& cube);
+
+    static Cubieste F(const Cubieste& cube);
+    static Cubieste F_PRIME(const Cubieste& cube);
+    static Cubieste F2(const Cubieste& cube);
+
+    static Cubieste B(const Cubieste& cube);
+    static Cubieste B_PRIME(const Cubieste& cube);
+    static Cubieste B2(const Cubieste& cube);
+
+    static Cubieste applyMove(const Cubieste& cube, int mv);
+};

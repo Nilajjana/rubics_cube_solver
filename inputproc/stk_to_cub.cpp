@@ -3,243 +3,299 @@
 #include "cube.hpp"
 #include "cubie.hpp"
 #include <iostream>
+#include <string>
+#include <stdexcept>
 #include <vector>
-#include <cstdlib>
+
 enum Face
 {
-    U,F,D,R,L,B
+    U, F, D, R, L, B
 };
-struct Stickerpos//contains face and index number of that sticker form the iput 
+
+struct Stickerpos
 {
     Face face;
     int index;
 };
-struct Corner//contains the total corner table for the input to get converted
+
+struct Corner
 {
     Stickerpos sticker[3];
 };
+
+// Fixed physical position -> facelet index table.
+// Order matches cp[] indices 0..7: UFR, UFL, ULB, UBR, DFR, DFL, DLB, DRB.
+// sticker[0] of every entry is always the U/D-facing facelet of that
+// corner position (unchanged from the original table).
 const Corner corner[8] =
 {
-    // UFR
-    {{{U, 8}, {F, 2}, {R,0}}},
-
-    // UFL
-    {{{U, 6}, {F, 0}, {L, 2}}},
-
-    // ULB
-    {{{U, 0}, {L, 0}, {B, 2}}},
-
-    // UBR
-    {{{U, 2}, {B, 0}, {R, 2}}},
-
-    // DFR
-    {{{D, 2}, {F, 8}, {R, 6}}},
-
-    // DFL
-    {{{D, 0}, {F, 6}, {L, 8}}},
-
-    // DLB
-    {{{D, 6}, {L, 6}, {B, 8}}},
-
-    // DRB
-    {{{D, 8}, {R, 8}, {B, 6}}}
+    {{{U, 8}, {F, 2}, {R, 0}}},   // UFR
+    {{{U, 6}, {F, 0}, {L, 2}}},   // UFL
+    {{{U, 0}, {L, 0}, {B, 2}}},   // ULB
+    {{{U, 2}, {B, 0}, {R, 2}}},   // UBR
+    {{{D, 2}, {F, 8}, {R, 6}}},   // DFR
+    {{{D, 0}, {F, 6}, {L, 8}}},   // DFL
+    {{{D, 6}, {L, 6}, {B, 8}}},   // DLB
+    {{{D, 8}, {R, 8}, {B, 6}}}    // DRB
 };
-char getsticker(Cube& cube,Stickerpos p)
-{
-    switch(p.face)
-    {
-        case U:return cube.U[p.index];
-        case F:return cube.F[p.index];
-        case D:return cube.D[p.index];
-        case R:return cube.R[p.index];
-        case L:return cube.L[p.index];
-        case B:return cube.B[p.index];
-    }
-    std::cout<<"getsticker success\n";
-    return '?';
-}
-std::array<char,3> getcolourcon(Cube cube,int a)
-{
-    std::cout<<"getcolourcon success\n";
-    return {getsticker(cube,corner[a].sticker[0]),
-            getsticker(cube,corner[a].sticker[1]),
-            getsticker(cube,corner[a].sticker[2])};
-}
-bool samecon(const std::array<char,3> a,const std::array<char,3> b)
-{
-    std::cout<<"samecon success\n";
-    return ((a[0]==b[0]||a[0]==b[1]||a[0]==b[2])
-            &&(a[1]==b[0]||a[1]==b[1]||a[1]==b[2])
-            &&(a[2]==b[0]||a[2]==b[1]||a[2]==b[2]));
-}
 
-int getCO(const std::array<char, 3>& colors, int position)
+static const char* CORNER_NAMES[8] =
 {
-    for (int i = 0; i < 3; i++)
-    {
-        if (colors[i] == 'W' || colors[i] == 'Y')
-            return i;   // trust the corner[] table's declared rotational order
-    }
-    return -1;
-}
+    "UFR", "UFL", "ULB", "UBR", "DFR", "DFL", "DLB", "DRB"
+};
 
-int getcp(std::array<char,3> colour)
-{
-    for(int i=0;i<8;i++)
-    {
-        if(samecon(colour,cornerTable[i].colors))
-        {
-            std::cout<<"getcp success\n";
-            return i;
-        }
-    }
-    return -1;
-}
 struct Edge
 {
     Stickerpos sticker[2];
 };
-const Edge edge[12]
+
+// Order matches ep[] indices 0..11: UF,UL,UB,UR,DF,DL,DB,DR,FL,LB,BR,RF.
+const Edge edge[12] =
 {
-    // UF
-    {{{U, 7}, {F, 1}}},
-
-    // UL
-    {{{U, 3}, {L, 1}}},
-
-    // UB
-    {{{U, 1}, {B, 1}}},
-
-    // UR
-    {{{U, 5}, {R, 1}}},
-
-    // DF
-    {{{D, 1}, {F, 7}}},
-
-    // DL
-    {{{D, 3}, {L, 7}}},
-
-    // DB
-    {{{D, 7}, {B, 7}}},
-
-    // DR
-    {{{D, 5}, {R, 7}}},
-
-    // FL
-    {{{F, 3}, {L, 5}}},
-
-    // LB
-    {{{L, 3}, {B, 5}}},
-
-    // BR
-    {{{B, 3}, {R, 5}}},
-
-    // RF
-    {{{R, 3}, {F, 5}}}
+    {{{U, 7}, {F, 1}}},   // UF
+    {{{U, 3}, {L, 1}}},   // UL
+    {{{U, 1}, {B, 1}}},   // UB
+    {{{U, 5}, {R, 1}}},   // UR
+    {{{D, 1}, {F, 7}}},   // DF
+    {{{D, 3}, {L, 7}}},   // DL
+    {{{D, 7}, {B, 7}}},   // DB
+    {{{D, 5}, {R, 7}}},   // DR
+    {{{F, 3}, {L, 5}}},   // FL
+    {{{L, 3}, {B, 5}}},   // LB
+    {{{B, 3}, {R, 5}}},   // BR
+    {{{R, 3}, {F, 5}}}    // RF
 };
-bool sameedg(const std::array<char,2> a,const std::array<char,2> b)
+
+static const char* EDGE_NAMES[12] =
 {
-    std::cout<<"sameedg success \n";
-    return ((a[0]==b[0]||a[0]==b[1])&&(a[1]==b[0]||a[1]==b[1]));
-}
-std::array<char,2> getcolouredg(Cube cube,int a)
+    "UF", "UL", "UB", "UR", "DF", "DL", "DB", "DR", "FL", "LB", "BR", "RF"
+};
+
+static char getsticker(Cube& cube, Stickerpos p)
 {
-    std::cout<<"getcolouredg success\n";
-    return {getsticker(cube,edge[a].sticker[0]),
-            getsticker(cube,edge[a].sticker[1]),};
-}
-int getep(std::array<char,2> colour)
-{
-    for(int i=0;i<12;i++)
+    switch (p.face)
     {
-        if(sameedg(colour,edgeTable[i].colors))
-        {
-            std::cout<<"getep success\n";
-            return i;
-        }
+        case U: return cube.U[p.index];
+        case F: return cube.F[p.index];
+        case D: return cube.D[p.index];
+        case R: return cube.R[p.index];
+        case L: return cube.L[p.index];
+        case B: return cube.B[p.index];
     }
-    return -1;
-}
-bool isUD(char c)
-{
-    return c == 'W' || c == 'Y';
+    return '?';
 }
 
-bool isFB(char c)
+// The colour scheme is no longer hardcoded. Centre stickers never move
+// relative to each other, so whatever colour sits at the centre of a
+// face position IS that face's colour on this particular cube -- read
+// it straight from the input instead of assuming white=Up etc. This
+// makes the decoder work regardless of which way the cube happens to
+// be held/photographed, and for any (self-consistent) sticker set, not
+// just the standard WCA colours.
+struct ColourScheme
 {
-    return c == 'G' || c == 'B';
-}
-int geteo(std::array<char,2> colour,int position)
-{
-    Face face1,face2;
-    face1=edge[position].sticker[0].face;
-    face2=edge[position].sticker[1].face;
-    if (isUD(colour[0])){
-        std::cout<<"succesfull eo finding";
-        return (face1 == U || face1 == D) ? 0 : 1;
-    }
-    if (isUD(colour[1])){
-        std::cout<<"succesfull eo finding";
-        return (face2 == U || face2 == D) ? 0 : 1;
-    }
-    // No U/D color => this is one of the middle-layer edges.
-    // Its F/B color determines orientation.
+    char toFace[256];   // toFace[(unsigned char)colour] = face letter, or 0 if unset
 
-    if (isFB(colour[0])){
-        std::cout<<"succesfull eo finding";
-        return (face1 == F || face1 == B) ? 0 : 1;
-    }
-    if (isFB(colour[1])){
-        std::cout<<"succesfull eo finding";
-        return (face2 == F || face2 == B) ? 0 : 1;
-    }
-    return -1; // impossible
-}
-Cubieste inpproc::cornerinfer(Cube& cube, Cubieste cst)
-{
-    static const char* names[8] = {"UFR","UFL","ULB","UBR","DFR","DFL","DLB","DRB"};
-    for (int i = 0; i < 8; i++)
+    char lookup(char colour) const
     {
-        auto colour = getcolourcon(cube, i);
-        int cp = getcp(colour);
-        if (cp == -1)
+        char f = toFace[(unsigned char)colour];
+        if (f == 0)
+            throw std::invalid_argument(
+                std::string("Sticker colour '") + colour +
+                "' never appears as a face centre, so it can't be "
+                "mapped to a face. Check the input.");
+        return f;
+    }
+};
+
+// index 4 of a 3x3 face (row-major) is always the centre sticker.
+static ColourScheme buildColourScheme(Cube& cube)
+{
+    ColourScheme scheme{};
+    for (auto& c : scheme.toFace)
+        c = 0;
+
+    const struct { char face; char colour; } centres[6] =
+    {
+        { 'U', cube.U[4] },
+        { 'F', cube.F[4] },
+        { 'D', cube.D[4] },
+        { 'R', cube.R[4] },
+        { 'L', cube.L[4] },
+        { 'B', cube.B[4] },
+    };
+
+    for (const auto& c : centres)
+    {
+        unsigned char key = (unsigned char)c.colour;
+        if (scheme.toFace[key] != 0)
+            throw std::invalid_argument(
+                std::string("Two face centres share the colour '") +
+                c.colour + "' -- a cube can't have two centres the same "
+                "colour. Check the input.");
+        scheme.toFace[key] = c.face;
+    }
+
+    return scheme;
+}
+
+// "Home" letters for corner position j: what should be read at that
+// position's three sticker slots on a solved cube. Derived directly
+// from the position table above, so there is only one table to keep
+// in sync, not two.
+static std::array<char, 3> homeCornerLetters(int j)
+{
+    static const char faceChar[6] = { 'U', 'F', 'D', 'R', 'L', 'B' };
+    return {
+        faceChar[corner[j].sticker[0].face],
+        faceChar[corner[j].sticker[1].face],
+        faceChar[corner[j].sticker[2].face]
+    };
+}
+
+static std::array<char, 2> homeEdgeLetters(int j)
+{
+    static const char faceChar[6] = { 'U', 'F', 'D', 'R', 'L', 'B' };
+    return {
+        faceChar[edge[j].sticker[0].face],
+        faceChar[edge[j].sticker[1].face]
+    };
+}
+
+// Reads the actual stickers at physical position i and finds which
+// corner identity sits there and at what orientation, by checking
+// every CYCLIC ROTATION of every home triple. A corner can physically
+// only be twisted, never mirrored, so only a rotation match is
+// accepted -- anything else (impossible / mistyped input) is rejected
+// with an error instead of being silently forced to some identity.
+static void decodeCornerAt(Cube& cube, const ColourScheme& scheme, int i,
+                            uint8_t& cpOut, uint8_t& coOut)
+{
+    std::array<char, 3> actual = {
+        scheme.lookup(getsticker(cube, corner[i].sticker[0])),
+        scheme.lookup(getsticker(cube, corner[i].sticker[1])),
+        scheme.lookup(getsticker(cube, corner[i].sticker[2]))
+    };
+
+    for (int j = 0; j < 8; ++j)
+    {
+        auto home = homeCornerLetters(j);
+
+        for (int r = 0; r < 3; ++r)
         {
-            std::cerr << "ERROR: corner " << names[i] << " (colors "
-                      << colour[0] << colour[1] << colour[2]
-                      << ") did not match any known corner\n";
-        }
-        cst.cp[i] = static_cast<uint8_t>(cp);
-        cst.co[i] = getCO(colour, i);
-    }
-    return cst;
-}
-Cubieste inpproc::edgeinfer(Cube& cube,Cubieste cst)
-{
-    for(int i=0;i<12;i++)
-    {
-        auto colour=getcolouredg(cube,i);
-        cst.ep[i]=getep(colour);
-        cst.eo[i]=geteo(colour,i);
-    }
-    std::cout<<"edgeinfer success\n";
-    return cst;
-}
-bool inpproc::inpvald(const uint8_t* p,int n)
-{
-    std::vector<bool> visited(n,false);
-    int j=0,cycles=0;
-    for(int i=0;i<n;i++)
-    {
-        if(!visited[i])
-        {
-            cycles++;
-            j=i;
-            while(!visited[j])
+            if (actual[0] == home[(0 + r) % 3] &&
+                actual[1] == home[(1 + r) % 3] &&
+                actual[2] == home[(2 + r) % 3])
             {
-                visited[j]=true;
-                j=p[j];
+                cpOut = static_cast<uint8_t>(j);
+                // r is how far the home triple had to rotate to reach
+                // the observed stickers; co is defined (matching the
+                // original getCO behaviour) as the slot index within
+                // the observed triple where the U/D-facing letter
+                // ended up, i.e. (3 - r) % 3.
+                coOut = static_cast<uint8_t>((3 - r) % 3);
+
+                std::cout << "Corner " << CORNER_NAMES[i] << ": "
+                          << actual[0] << actual[1] << actual[2]
+                          << " -> cp = " << j << ", co = " << (int)coOut
+                          << '\n';
+                return;
             }
         }
     }
-    return (n-cycles)%2;
+
+    throw std::runtime_error(
+        std::string("ERROR: corner ") + CORNER_NAMES[i] +
+        " (stickers " + actual[0] + actual[1] + actual[2] +
+        ") does not match any valid corner. This means either a typo "
+        "in the input or a physically impossible (mirrored) cube.");
+}
+
+// Same idea for edges. An edge has only two stickers, so the only two
+// possibilities are "same order as home" (eo = 0) or "swapped" (eo = 1);
+// there is no mirrored/rotated case to worry about.
+static void decodeEdgeAt(Cube& cube, const ColourScheme& scheme, int i,
+                          uint8_t& epOut, uint8_t& eoOut)
+{
+    std::array<char, 2> actual = {
+        scheme.lookup(getsticker(cube, edge[i].sticker[0])),
+        scheme.lookup(getsticker(cube, edge[i].sticker[1]))
+    };
+
+    for (int j = 0; j < 12; ++j)
+    {
+        auto home = homeEdgeLetters(j);
+
+        if (actual[0] == home[0] && actual[1] == home[1])
+        {
+            epOut = static_cast<uint8_t>(j);
+            eoOut = 0;
+            std::cout << "Edge " << EDGE_NAMES[i] << ": "
+                      << actual[0] << actual[1]
+                      << " -> ep = " << j << ", eo = 0\n";
+            return;
+        }
+        if (actual[0] == home[1] && actual[1] == home[0])
+        {
+            epOut = static_cast<uint8_t>(j);
+            eoOut = 1;
+            std::cout << "Edge " << EDGE_NAMES[i] << ": "
+                      << actual[0] << actual[1]
+                      << " -> ep = " << j << ", eo = 1\n";
+            return;
+        }
+    }
+
+    throw std::runtime_error(
+        std::string("ERROR: edge ") + EDGE_NAMES[i] +
+        " (stickers " + actual[0] + actual[1] +
+        ") does not match any known edge. Check your input.");
+}
+
+Cubieste inpproc::cornerinfer(Cube& cube, Cubieste cst)
+{
+    ColourScheme scheme = buildColourScheme(cube);
+
+    for (int i = 0; i < 8; i++)
+    {
+        uint8_t cp, co;
+        decodeCornerAt(cube, scheme, i, cp, co);
+        cst.cp[i] = cp;
+        cst.co[i] = co;
+    }
+    return cst;
+}
+
+Cubieste inpproc::edgeinfer(Cube& cube, Cubieste cst)
+{
+    ColourScheme scheme = buildColourScheme(cube);
+
+    for (int i = 0; i < 12; i++)
+    {
+        uint8_t ep, eo;
+        decodeEdgeAt(cube, scheme, i, ep, eo);
+        cst.ep[i] = ep;
+        cst.eo[i] = eo;
+    }
+    return cst;
+}
+
+bool inpproc::inpvald(const uint8_t* p, int n)
+{
+    std::vector<bool> visited(n, false);
+    int j = 0, cycles = 0;
+    for (int i = 0; i < n; i++)
+    {
+        if (!visited[i])
+        {
+            cycles++;
+            j = i;
+            while (!visited[j])
+            {
+                visited[j] = true;
+                j = p[j];
+            }
+        }
+    }
+    return (n - cycles) % 2;
 }
