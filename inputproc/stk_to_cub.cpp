@@ -6,6 +6,7 @@
 #include <string>
 #include <stdexcept>
 #include <vector>
+#include <algorithm>
 
 enum Face
 {
@@ -169,7 +170,7 @@ static std::array<char, 2> homeEdgeLetters(int j)
 // accepted -- anything else (impossible / mistyped input) is rejected
 // with an error instead of being silently forced to some identity.
 static void decodeCornerAt(Cube& cube, const ColourScheme& scheme, int i,
-                            uint8_t& cpOut, uint8_t& coOut)
+                           uint8_t& cpOut, uint8_t& coOut)
 {
     std::array<char, 3> actual = {
         scheme.lookup(getsticker(cube, corner[i].sticker[0])),
@@ -181,34 +182,83 @@ static void decodeCornerAt(Cube& cube, const ColourScheme& scheme, int i,
     {
         auto home = homeCornerLetters(j);
 
-        for (int r = 0; r < 3; ++r)
-        {
-            if (actual[0] == home[(0 + r) % 3] &&
-                actual[1] == home[(1 + r) % 3] &&
-                actual[2] == home[(2 + r) % 3])
-            {
-                cpOut = static_cast<uint8_t>(j);
-                // r is how far the home triple had to rotate to reach
-                // the observed stickers; co is defined (matching the
-                // original getCO behaviour) as the slot index within
-                // the observed triple where the U/D-facing letter
-                // ended up, i.e. (3 - r) % 3.
-                coOut = static_cast<uint8_t>((3 - r) % 3);
+        std::array<char, 3> a = actual;
+        std::array<char, 3> h = home;
 
-                std::cout << "Corner " << CORNER_NAMES[i] << ": "
-                          << actual[0] << actual[1] << actual[2]
-                          << " -> cp = " << j << ", co = " << (int)coOut
-                          << '\n';
-                return;
+        std::sort(a.begin(), a.end());
+        std::sort(h.begin(), h.end());
+
+        if (a != h)
+            continue;
+
+        cpOut = static_cast<uint8_t>(j);
+
+        // --------------------------------------------------------
+        // Find the U/D sticker.
+        //
+        // actual[k] tells us WHICH sticker it is.
+        //
+        // corner[i].sticker[k].face tells us WHERE that sticker
+        // currently physically sits.
+        // --------------------------------------------------------
+
+        Face physicalFace;
+
+        bool found = false;
+
+        for (int k = 0; k < 3; ++k)
+        {
+            if (actual[k] == 'U' || actual[k] == 'D')
+            {
+                physicalFace = corner[i].sticker[k].face;
+                found = true;
+                break;
             }
         }
+
+        if (!found)
+        {
+            throw std::runtime_error(
+                "Corner has no U/D sticker.");
+        }
+
+        // Kociemba convention:
+        //
+        // U/D physical face -> 0
+        // R/L physical face -> 1
+        // F/B physical face -> 2
+
+        switch (physicalFace)
+        {
+            case U:
+            case D:
+                coOut = 0;
+                break;
+
+            case R:
+            case L:
+                coOut = 1;
+                break;
+
+            case F:
+            case B:
+                coOut = 2;
+                break;
+        }
+
+        std::cout << "Corner " << CORNER_NAMES[i] << ": "
+                  << actual[0] << actual[1] << actual[2]
+                  << " -> cp = " << static_cast<int>(cpOut)
+                  << ", co = " << static_cast<int>(coOut)
+                  << '\n';
+
+        return;
     }
 
     throw std::runtime_error(
         std::string("ERROR: corner ") + CORNER_NAMES[i] +
         " (stickers " + actual[0] + actual[1] + actual[2] +
-        ") does not match any valid corner. This means either a typo "
-        "in the input or a physically impossible (mirrored) cube.");
+        ") does not correspond to any valid corner.");
 }
 
 // Same idea for edges. An edge has only two stickers, so the only two
@@ -263,6 +313,23 @@ Cubieste inpproc::cornerinfer(Cube& cube, Cubieste cst)
         cst.cp[i] = cp;
         cst.co[i] = co;
     }
+    std::cout << "\nCorner orientation sum = ";
+    
+    int cornerSum = 0;
+    
+    for (int i = 0; i < 8; i++)
+    {
+    std::cout << static_cast<int>(cst.co[i]);
+    
+        if (i != 7)
+            std::cout << " + ";
+    
+        cornerSum += cst.co[i];
+    }
+    
+    std::cout << " = " << cornerSum
+         << " mod 3 = " << cornerSum % 3
+         << "\n";
     return cst;
 }
 

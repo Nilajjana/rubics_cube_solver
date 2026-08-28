@@ -54,7 +54,7 @@ public:
         cout << "Enter faces in physical position order: U F D R L B\n";
         cout << "Each face requires 9 stickers.\n\n";
 
-        cout << "Enter U face:\n";
+        cout << "Enter U face with capital letter colour symbol like W=white Y=yellow R=red B=blue O=orange G=green:\n";
         auto Uraw = input();
 
         cout << "Enter F face:\n";
@@ -362,7 +362,7 @@ int main()
     KociembaPhase1 kp1;
     if(kp1.soln_chkr(cb))
     {
-        cout<<"it is already solved nigger what do u want are u dumb??\n";
+        cout<<"it is already solved migger what do u want are u dumb??\n";
         return 0;
     }
     Heuristictable ht;

@@ -30,8 +30,15 @@ void Heuristictable::loadTables()
 
 void Heuristictable::generateTables()
 {
+    namespace fs = std::filesystem;
+
+    const fs::path directory = "tables";
+
+    // Make sure the tables directory exists
+    fs::create_directories(directory);
+
+    std::cout << "Generating tables...\n";
     // Generate pruning tables
-    std::cout<<"generating tables\n";
     Bfs bf;
     bf.bfstwstsls(Heuristic::twistSliceTable);
     bf.bfsflpsls(Heuristic::flipSliceTable);
