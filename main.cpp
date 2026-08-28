@@ -387,3 +387,5 @@ int main()
 
     return 0;
 }
+
+//still there is abi error in co calculatio and icannot get rid of it i am leaving it at this will return later and until then buy 

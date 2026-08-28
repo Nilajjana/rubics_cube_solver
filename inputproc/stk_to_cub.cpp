@@ -182,6 +182,7 @@ static void decodeCornerAt(Cube& cube, const ColourScheme& scheme, int i,
     {
         auto home = homeCornerLetters(j);
 
+        // Find whether the same three stickers are present.
         std::array<char, 3> a = actual;
         std::array<char, 3> h = home;
 
@@ -193,57 +194,48 @@ static void decodeCornerAt(Cube& cube, const ColourScheme& scheme, int i,
 
         cpOut = static_cast<uint8_t>(j);
 
-        // --------------------------------------------------------
-        // Find the U/D sticker.
-        //
-        // actual[k] tells us WHICH sticker it is.
-        //
-        // corner[i].sticker[k].face tells us WHERE that sticker
-        // currently physically sits.
-        // --------------------------------------------------------
+        /*
+         * Corner orientation:
+         *
+         * Look at the U/D sticker of the PIECE.
+         *
+         * Find where that sticker is in the current physical
+         * corner position.
+         *
+         * The physical corner slots are:
+         *
+         *   slot 0 = U/D face
+         *   slot 1 = side face
+         *   slot 2 = side face
+         *
+         * co is therefore the slot containing the U/D sticker,
+         * but we must normalize the two side slots according to
+         * the Kociemba convention.
+         */
 
-        Face physicalFace;
-
-        bool found = false;
+        int udSlot = -1;
 
         for (int k = 0; k < 3; ++k)
         {
             if (actual[k] == 'U' || actual[k] == 'D')
             {
-                physicalFace = corner[i].sticker[k].face;
-                found = true;
+                udSlot = k;
                 break;
             }
         }
 
-        if (!found)
+        if (udSlot == 0)
         {
-            throw std::runtime_error(
-                "Corner has no U/D sticker.");
+            coOut = 0;
         }
-
-        // Kociemba convention:
-        //
-        // U/D physical face -> 0
-        // R/L physical face -> 1
-        // F/B physical face -> 2
-
-        switch (physicalFace)
+        else
         {
-            case U:
-            case D:
-                coOut = 0;
-                break;
+            Face f = corner[i].sticker[udSlot].face;
 
-            case R:
-            case L:
+            if (f == R || f == L)
                 coOut = 1;
-                break;
-
-            case F:
-            case B:
+            else
                 coOut = 2;
-                break;
         }
 
         std::cout << "Corner " << CORNER_NAMES[i] << ": "
