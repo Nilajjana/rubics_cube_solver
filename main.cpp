@@ -316,16 +316,6 @@ int main()
     Cubieste cb;
     cb=ip.cornerinfer(cub,cb);
     cb=ip.edgeinfer(cub,cb);
-    std::cout <<"the cp and co are";
-    for(int i=0;i<8;i++)
-    {
-        std::cout<<static_cast<int>(cb.cp[i])<<"   "<<static_cast<int>(cb.co[i])<<"\n";
-    }
-    std::cout<< "the ep and eo are";
-    for(int i=0;i<12;i++)
-    {
-        std::cout<<static_cast<int>(cb.ep[i])<<"   "<<static_cast<int>(cb.eo[i])<<"\n";
-    }
 
     int vald1=ip.inpvald(cb.cp,8);
     int vald2=ip.inpvald(cb.ep,12);
