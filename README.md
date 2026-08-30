@@ -602,36 +602,6 @@ The project therefore provides a complete interactive pipeline:
 
 ---
 
-## Known Issues / TODO
 
-The solver currently:
-
-* Runs successfully.
-* Accepts and validates cube configurations.
-* Generates and loads pruning tables.
-* Performs both phases of the Kociemba search.
-* Produces a complete solution sequence.
-
-However, there is currently an issue when the generated solution is physically applied to the scrambled cube.
-
-After applying the complete solution, **four edges remain flipped**:
-
-```text
-BL
-BD
-RB
-RF
-```
-
-This suggests that there is still an issue somewhere in the:
-
-* Edge orientation calculation (`eo`)
-* Edge permutation/orientation transformations
-* Move engine
-* Solution application pipeline
-
-The next major debugging task is therefore to investigate the edge-orientation calculation and/or the edge permutation/orientation transformations.
-
----
 
 ---
