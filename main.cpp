@@ -8,6 +8,7 @@
 #include "rubicsmove/cubemove.hpp"
 #include <ncurses.h>
 #include "inputproc/cube_inp.hpp"
+#include <optional>
 
 using namespace std;
 
@@ -38,19 +39,17 @@ public:
         and every other sticker having that colour gets
         converted to the corresponding face label.
     */
-    Cube usrinp()
+    std::optional<Cube> usrinp()
     {
         Cube cub;
-
-        cout << "Enter all facelets using COLOUR letters.\n";
-        cout << "Enter faces in physical position order: U F D R L B\n";
-        cout << "Each face requires 9 stickers.\n\n";
-
-        cout << "Enter U face with capital letter colour symbol like W=white Y=yellow R=red B=blue O=orange G=green:\n";
         CubeInput editor;
 
         auto inputFaces = editor.run();
-
+        if (editor.wasCancelled())
+        {
+            cout << "\nInput cancelled by user (ESC). Exiting.\n";
+            exit(0);
+        }
         auto Uraw = inputFaces[0];
         auto Fraw = inputFaces[1];
         auto Draw = inputFaces[2];
@@ -89,11 +88,11 @@ public:
             {
                 if (centres[i] == centres[j])
                 {
-                    cerr << "\nERROR: Two face centres have the same colour: "
+                    cout << "\nWARNING: Two face centres have the same colour: "
                          << centres[i] << "\n";
 
-                    cerr << "The six centre colours must all be different.\n";
-                    exit(1);
+                    cout << "The six centre colours must all be different.\n";
+                    return std::nullopt;
                 }
             }
         }
@@ -136,10 +135,12 @@ public:
             Convert one raw face from colours into
             U/F/D/R/L/B facelet labels.
         */
+        bool unknownColour = false;
+
         auto convertFace =
         [&](const array<char, 9>& raw)
         {
-            array<char, 9> converted;
+            array<char, 9> converted{};
 
             for (int i = 0; i < 9; i++)
             {
@@ -147,10 +148,11 @@ public:
 
                 if (it == colourToFace.end())
                 {
-                    cerr << "\nERROR: Unknown colour '"
+                    cout << "\nWARNING: Unknown colour '"
                          << raw[i] << "' found in input.\n";
 
-                    exit(1);
+                    unknownColour = true;
+                    return converted;
                 }
 
                 converted[i] = it->second;
@@ -164,11 +166,17 @@ public:
             Now convert all six physical faces.
         */
         cub.U = convertFace(Uraw);
+        if (unknownColour) return std::nullopt;
         cub.F = convertFace(Fraw);
+        if (unknownColour) return std::nullopt;
         cub.D = convertFace(Draw);
+        if (unknownColour) return std::nullopt;
         cub.R = convertFace(Rraw);
+        if (unknownColour) return std::nullopt;
         cub.L = convertFace(Lraw);
+        if (unknownColour) return std::nullopt;
         cub.B = convertFace(Braw);
+        if (unknownColour) return std::nullopt;
 
 
         /*
@@ -184,18 +192,23 @@ public:
         for (char c : Lraw) count[(unsigned char)c]++;
         for (char c : Braw) count[(unsigned char)c]++;
 
+        bool countBad = false;
+
         for (char c : centres)
         {
             if (count[(unsigned char)c] != 9)
             {
-                cerr << "\nERROR: Colour '" << c
+                cout << "\nWARNING: Colour '" << c
                      << "' occurs "
                      << count[(unsigned char)c]
                      << " times instead of 9.\n";
 
-                exit(1);
+                countBad = true;
             }
         }
+
+        if (countBad)
+            return std::nullopt;
 
 
         /*
@@ -275,44 +288,79 @@ int main()
 {
     Cube cub;
     tsmltoseg ob;
-    cub=ob.usrinp();
     inpproc ip;
     Cubieste cb;
-    cb=ip.cornerinfer(cub,cb);
-    cb=ip.edgeinfer(cub,cb);
 
-    int vald1=ip.inpvald(cb.cp,8);
-    int vald2=ip.inpvald(cb.ep,12);
-    int sum=0;
-    for(int i=0;i<8;i++)
+    while (true)
     {
-        sum+=cb.co[i];
+        auto result = ob.usrinp();
+
+        if (!result)
+        {
+            cout << "\nPress any key to re-enter the cube "
+                    "(or ESC on the input screen to quit).\n";
+            cout.flush();
+            std::cin.get();
+            continue;
+        }
+
+        cub = *result;
+        cb = Cubieste{};
+
+        bool decodeFailed = false;
+
+        try
+        {
+            cb = ip.cornerinfer(cub, cb);
+            cb = ip.edgeinfer(cub, cb);
+        }
+        catch (const std::exception& e)
+        {
+            cout << "\nWARNING: could not interpret the cube from your input:\n"
+                 << "  " << e.what() << "\n";
+            decodeFailed = true;
+        }
+
+        if (decodeFailed)
+        {
+            cout << "\nPress any key to re-enter the cube "
+                    "(or ESC on the input screen to quit).\n";
+            cout.flush();
+            std::cin.get();
+            continue;
+        }
+
+        int vald1 = ip.inpvald(cb.cp, 8);
+        int vald2 = ip.inpvald(cb.ep, 12);
+
+        int sum = 0;
+        for (int i = 0; i < 8; i++)
+            sum += cb.co[i];
+        int cosas = sum % 3;
+
+        sum = 0;
+        for (int i = 0; i < 12; i++)
+            sum += cb.eo[i];
+        int eosas = sum % 2;
+
+        bool bad = (vald1 != vald2) || (cosas != 0) || (eosas != 0);
+
+        if (!bad)
+            break;   // valid input — proceed to solving below
+
+        if (vald1 != vald2)
+            cout << "there are cycles in ur input\n";
+        if (eosas != 0)
+            cout << "the edge orientations are wrong\n";
+        if (cosas != 0)
+            cout << "the corner orientations are wrong\n";
+
+        cout << "\nWARNING: the input is invalid. Press any key to re-enter the cube "
+                "(or ESC on the input screen to quit).\n";
+        cout.flush();
+        std::cin.get();
     }
-    int cosas=sum%3;
-    sum=0;
-    for(int i=0;i<12;i++)
-    {
-        sum+=cb.eo[i];
-    }
-    int eosas=sum%2;
-    
-    if(vald1!=vald2)
-    {
-        cout<<"there are cycles in ur input\n"; 
-    }
-    if(eosas!=0)
-    {
-        cout<<"the edge orientations are wrong\n";
-    }
-    if(cosas!=0)
-    {
-        cout<<"the corner orientations are wrong\n";
-    }
-    if(vald1!=vald2||cosas!=0||eosas!=0)
-    {
-        std::cout<<"the input is wrong pls enter correct input\n";
-        return 0;
-    }
+
     KociembaPhase1 kp1;
     if(kp1.soln_chkr(cb))
     {
@@ -341,4 +389,3 @@ int main()
 
     return 0;
 }
-

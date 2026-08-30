@@ -3,16 +3,9 @@
 #include <ncurses.h>
 
 #include <array>
-#include <cstdlib>
-#include <string>
+
 
 CubeInput::CubeInput()
-{
-    reset();
-}
-
-
-void CubeInput::reset()
 {
     /*
         Face order:
@@ -25,45 +18,39 @@ void CubeInput::reset()
             5 = B
     */
 
-    faces = {};
-
     /*
-        Give every sticker an initial colour.
+        Start with all stickers blank.
 
-        The centres are initialized to their conventional
-        colours so that the cube starts as a solved cube.
-
-            U = W
-            F = R
-            D = Y
-            R = B
-            L = G
-            B = O
+        The user will enter every sticker manually.
     */
 
-    const std::array<char, 6> centreColours =
+    for (auto& face : faces)
     {
-        'W',   // U
-        'R',   // F
-        'Y',   // D
-        'B',   // R
-        'G',   // L
-        'O'    // B
-    };
-
-    for (int face = 0; face < 6; face++)
-    {
-        for (int i = 0; i < 9; i++)
-        {
-            faces[face][i] = centreColours[face];
-        }
+        face.fill(' ');
     }
+
+    /*
+        Start cursor at U1.
+    */
 
     currentFace = 0;
     currentRow = 0;
     currentCol = 0;
 }
 
+
+/*
+    Convert a face/row/column position into
+    terminal coordinates.
+
+    Cube layout:
+
+                       U
+
+                L      F      R      B
+
+                       D
+*/
 
 void CubeInput::getScreenPosition(
     int face,
@@ -73,18 +60,6 @@ void CubeInput::getScreenPosition(
     int& x
 ) const
 {
-    /*
-        Each sticker occupies 4 terminal columns.
-
-        The cube net is:
-
-                       U
-
-                L      F      R      B
-
-                       D
-    */
-
     constexpr int stickerWidth = 4;
     constexpr int stickerHeight = 2;
 
@@ -100,33 +75,50 @@ void CubeInput::getScreenPosition(
     switch (face)
     {
         case 0: // U
+
             faceX = leftX + faceGap;
             faceY = topY;
+
             break;
+
 
         case 1: // F
+
             faceX = leftX + faceGap;
             faceY = middleY;
+
             break;
+
 
         case 2: // D
+
             faceX = leftX + faceGap;
             faceY = middleY + 10;
+
             break;
+
 
         case 3: // R
+
             faceX = leftX + (faceGap * 2);
             faceY = middleY;
+
             break;
+
 
         case 4: // L
+
             faceX = leftX;
             faceY = middleY;
+
             break;
 
+
         case 5: // B
+
             faceX = leftX + (faceGap * 3);
             faceY = middleY;
+
             break;
     }
 
@@ -135,9 +127,17 @@ void CubeInput::getScreenPosition(
 }
 
 
+/*
+    Draw the entire cube.
+*/
+
 void CubeInput::draw()
 {
     clear();
+
+    /*
+        Title.
+    */
 
     mvprintw(
         0,
@@ -145,11 +145,28 @@ void CubeInput::draw()
         "RUBIK'S CUBE INPUT"
     );
 
+
+    /*
+        Controls.
+    */
+
     mvprintw(
         1,
         0,
-        "Arrow Keys: Move    SPACE: Change colour    R: Reset    ENTER: Confirm"
+        "Arrow Keys: Move    W/Y/R/B/O/G: Set colour    ENTER: Confirm"
     );
+
+
+    /*
+        Face names.
+
+            0 = U
+            1 = F
+            2 = D
+            3 = R
+            4 = L
+            5 = B
+    */
 
     const char* faceNames[6] =
     {
@@ -161,6 +178,7 @@ void CubeInput::draw()
         "B"
     };
 
+
     /*
         Draw face labels.
     */
@@ -170,9 +188,20 @@ void CubeInput::draw()
         int y;
         int x;
 
-        getScreenPosition(face, 0, 0, y, x);
+        getScreenPosition(
+            face,
+            0,
+            0,
+            y,
+            x
+        );
 
-        mvprintw(y - 2, x, "%s", faceNames[face]);
+        mvprintw(
+            y - 2,
+            x,
+            "%s",
+            faceNames[face]
+        );
     }
 
 
@@ -197,7 +226,14 @@ void CubeInput::draw()
                     x
                 );
 
-                char colour = faces[face][row * 3 + col];
+
+                /*
+                    Get the sticker colour.
+                */
+
+                char colour =
+                    faces[face][row * 3 + col];
+
 
                 /*
                     Highlight the currently selected sticker.
@@ -212,12 +248,33 @@ void CubeInput::draw()
                     attron(A_REVERSE);
                 }
 
-                mvprintw(
-                    y,
-                    x,
-                    "[%c]",
-                    colour
-                );
+
+                /*
+                    Display blank stickers as [ ].
+                */
+
+                if (colour == ' ')
+                {
+                    mvprintw(
+                        y,
+                        x,
+                        "[ ]"
+                    );
+                }
+                else
+                {
+                    mvprintw(
+                        y,
+                        x,
+                        "[%c]",
+                        colour
+                    );
+                }
+
+
+                /*
+                    Remove highlight.
+                */
 
                 if (
                     face == currentFace &&
@@ -239,70 +296,76 @@ void CubeInput::draw()
     mvprintw(
         27,
         0,
-        "Current: %s%d%d",
+        "Current: %s [%d,%d]",
         faceNames[currentFace],
         currentRow + 1,
         currentCol + 1
     );
 
+
+    /*
+        Valid colours.
+    */
+
     mvprintw(
         28,
         0,
-        "Colours: W  Y  R  B  O  G"
+        "Valid colours: W  Y  R  B  O  G"
     );
+
+
+    /*
+        Explanation.
+    */
 
     mvprintw(
         29,
         0,
+        "Lowercase letters are automatically converted to uppercase."
+    );
+
+
+    mvprintw(
+        30,
+        0,
         "Press ENTER when the cube is completely entered."
     );
+
+
     refresh();
 }
 
 
-void CubeInput::nextColour()
-{
-    /*
-        Colour cycle:
+/*
+    Handle keyboard input.
 
-            W → Y → R → B → O → G → W
-    */
+    Valid colour keys:
 
-    static const std::array<char, 6> colours =
-    {
-        'W',
-        'Y',
-        'R',
-        'B',
-        'O',
-        'G'
-    };
+        W / w
+        Y / y
+        R / r
+        B / b
+        O / o
+        G / g
 
-    char& current =
-        faces[currentFace][currentRow * 3 + currentCol];
+    Everything else is ignored except:
 
-    for (std::size_t i = 0; i < colours.size(); i++)
-    {
-        if (current == colours[i])
-        {
-            current = colours[(i + 1) % colours.size()];
-            return;
-        }
-    }
-
-    /*
-        If somehow the current sticker contains an invalid
-        character, reset it to the first colour.
-    */
-
-    current = colours[0];
-}
+        Arrow keys
+        ENTER
+*/
 
 
 bool CubeInput::handleInput(int key)
 {
     switch (key)
     {
+        /*
+            UP
+        */
+        case 27:
+            cancelled = true;
+            return false;
+
         case KEY_UP:
 
             if (currentRow > 0)
@@ -312,18 +375,18 @@ bool CubeInput::handleInput(int key)
             else
             {
                 /*
-                    Move from the top of a face to the face above it.
+                    Move between horizontal faces.
 
                     F -> U
                     D -> F
                 */
 
-                if (currentFace == 1)       // F -> U
+                if (currentFace == 1)
                 {
                     currentFace = 0;
                     currentRow = 2;
                 }
-                else if (currentFace == 2)  // D -> F
+                else if (currentFace == 2)
                 {
                     currentFace = 1;
                     currentRow = 2;
@@ -332,6 +395,10 @@ bool CubeInput::handleInput(int key)
 
             return true;
 
+
+        /*
+            DOWN
+        */
 
         case KEY_DOWN:
 
@@ -342,18 +409,18 @@ bool CubeInput::handleInput(int key)
             else
             {
                 /*
-                    Move from the bottom of a face to the face below it.
+                    Move between horizontal faces.
 
                     U -> F
                     F -> D
                 */
 
-                if (currentFace == 0)       // U -> F
+                if (currentFace == 0)
                 {
                     currentFace = 1;
                     currentRow = 0;
                 }
-                else if (currentFace == 1)  // F -> D
+                else if (currentFace == 1)
                 {
                     currentFace = 2;
                     currentRow = 0;
@@ -362,6 +429,10 @@ bool CubeInput::handleInput(int key)
 
             return true;
 
+
+        /*
+            LEFT
+        */
 
         case KEY_LEFT:
 
@@ -372,33 +443,30 @@ bool CubeInput::handleInput(int key)
             else
             {
                 /*
-                    Move between the side faces.
+                    Move around the four side faces.
 
                     F -> L
                     R -> F
                     B -> R
                     L -> B
-
-                    This makes the horizontal navigation wrap
-                    around the four side faces.
                 */
 
-                if (currentFace == 1)       // F -> L
+                if (currentFace == 1)
                 {
                     currentFace = 4;
                     currentCol = 2;
                 }
-                else if (currentFace == 3)  // R -> F
+                else if (currentFace == 3)
                 {
                     currentFace = 1;
                     currentCol = 2;
                 }
-                else if (currentFace == 5)  // B -> R
+                else if (currentFace == 5)
                 {
                     currentFace = 3;
                     currentCol = 2;
                 }
-                else if (currentFace == 4)  // L -> B
+                else if (currentFace == 4)
                 {
                     currentFace = 5;
                     currentCol = 2;
@@ -407,6 +475,10 @@ bool CubeInput::handleInput(int key)
 
             return true;
 
+
+        /*
+            RIGHT
+        */
 
         case KEY_RIGHT:
 
@@ -417,7 +489,7 @@ bool CubeInput::handleInput(int key)
             else
             {
                 /*
-                    Move between the side faces.
+                    Move around the four side faces.
 
                     L -> F
                     F -> R
@@ -425,22 +497,22 @@ bool CubeInput::handleInput(int key)
                     B -> L
                 */
 
-                if (currentFace == 4)       // L -> F
+                if (currentFace == 4)
                 {
                     currentFace = 1;
                     currentCol = 0;
                 }
-                else if (currentFace == 1)  // F -> R
+                else if (currentFace == 1)
                 {
                     currentFace = 3;
                     currentCol = 0;
                 }
-                else if (currentFace == 3)  // R -> B
+                else if (currentFace == 3)
                 {
                     currentFace = 5;
                     currentCol = 0;
                 }
-                else if (currentFace == 5)  // B -> L
+                else if (currentFace == 5)
                 {
                     currentFace = 4;
                     currentCol = 0;
@@ -450,28 +522,101 @@ bool CubeInput::handleInput(int key)
             return true;
 
 
-        case ' ':
+        /*
+            WHITE
+        */
 
-            nextColour();
+        case 'w':
+        case 'W':
+
+            faces[currentFace]
+                 [currentRow * 3 + currentCol] = 'W';
+
             return true;
 
+
+        /*
+            YELLOW
+        */
+
+        case 'y':
+        case 'Y':
+
+            faces[currentFace]
+                 [currentRow * 3 + currentCol] = 'Y';
+
+            return true;
+
+
+        /*
+            RED
+        */
 
         case 'r':
         case 'R':
 
-            reset();
+            faces[currentFace]
+                 [currentRow * 3 + currentCol] = 'R';
+
             return true;
 
+
+        /*
+            BLUE
+        */
+
+        case 'b':
+        case 'B':
+
+            faces[currentFace]
+                 [currentRow * 3 + currentCol] = 'B';
+
+            return true;
+
+
+        /*
+            ORANGE
+        */
+
+        case 'o':
+        case 'O':
+
+            faces[currentFace]
+                 [currentRow * 3 + currentCol] = 'O';
+
+            return true;
+
+
+        /*
+            GREEN
+        */
+
+        case 'g':
+        case 'G':
+
+            faces[currentFace]
+                 [currentRow * 3 + currentCol] = 'G';
+
+            return true;
+
+
+        /*
+            ENTER
+
+            Finish the input.
+        */
 
         case '\n':
         case KEY_ENTER:
 
-            /*
-                Finish editing the entire cube.
-            */
-
             return false;
 
+
+        /*
+            EVERYTHING ELSE
+
+            Ignore it.
+        */
 
         default:
 
@@ -479,43 +624,50 @@ bool CubeInput::handleInput(int key)
     }
 }
 
+
+/*
+    Start the interactive editor.
+*/
+
 std::array<std::array<char, 9>, 6> CubeInput::run()
 {
     /*
-        Initialize ncurses.
+        Start ncurses.
     */
 
     initscr();
 
+
     /*
-        Don't wait for Enter after every key.
+        Read keys immediately without requiring ENTER.
     */
 
     cbreak();
 
+
     /*
-        We don't want typed characters automatically
-        appearing on the screen.
+        Don't echo typed characters.
     */
 
     noecho();
 
+
     /*
-        Enable arrow keys.
+        Enable arrow-key processing.
     */
 
     keypad(stdscr, TRUE);
 
+
     /*
-        Don't block waiting for a character.
-        We DO want blocking input here, so getch()
-        waits until the user presses something.
+        Hide the normal terminal cursor.
     */
 
     curs_set(0);
 
+
     /*
-        Main editor loop.
+        Main input loop.
     */
 
     bool running = true;
@@ -529,11 +681,24 @@ std::array<std::array<char, 9>, 6> CubeInput::run()
         running = handleInput(key);
     }
 
+
     /*
-        Restore the normal terminal before returning.
+        Restore normal terminal mode.
     */
 
     endwin();
+
+
+    /*
+        Return all six faces.
+
+            [0] = U
+            [1] = F
+            [2] = D
+            [3] = R
+            [4] = L
+            [5] = B
+    */
 
     return faces;
 }
