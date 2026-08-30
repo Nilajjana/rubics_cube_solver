@@ -146,18 +146,8 @@ The program will:
 
 ## Known Issues / TODO
 
-- `main.cpp` contains an inappropriate slur in the "already solved" message
-  that should be removed/replaced before any public or shared use.
-- `heuristictable.cpp` still has a stray `// TODO` comment referencing work
-  that appears to already be implemented (`bf cpslice`, `bf udedge_slice`)
-  — worth cleaning up.
-- `stk_to_cub.cpp` has many leftover `std::cout << "... success"` debug
-  print statements that spam stdout on every run; consider removing or
-  gating them behind a debug flag.
-- No automated tests are included.
-- No `CMakeLists.txt`/`Makefile` is present; build command above is a
-  manual reference.
+- the code runs fine and solves every thing but even at the end 9 edges remin
+  flipped after implementing the solving sequence on the scrambled cube the 
+  edges are nmely UF, FL, FR, BD, UL, DL, DR.
 
-## License
 
-No license file is currently included in the project.
