@@ -6,6 +6,8 @@
 #include "bfstable/encoder.hpp"
 #include "kociemba/kociemba_ph1.hpp"
 #include "rubicsmove/cubemove.hpp"
+#include <ncurses.h>
+#include "inputproc/cube_inp.hpp"
 
 using namespace std;
 
@@ -13,16 +15,6 @@ class tsmltoseg
 {
 public:
 
-    // Read exactly 9 colour characters for one physical face
-    array<char, 9> input()
-    {
-        array<char, 9> face;
-
-        for (int i = 0; i < 9; i++)
-            cin >> face[i];
-
-        return face;
-    }
 
     /*
         Convert arbitrary colour letters into the solver's
@@ -55,23 +47,16 @@ public:
         cout << "Each face requires 9 stickers.\n\n";
 
         cout << "Enter U face with capital letter colour symbol like W=white Y=yellow R=red B=blue O=orange G=green:\n";
-        auto Uraw = input();
+        CubeInput editor;
 
-        cout << "Enter F face:\n";
-        auto Fraw = input();
+        auto inputFaces = editor.run();
 
-        cout << "Enter D face:\n";
-        auto Draw = input();
-
-        cout << "Enter R face:\n";
-        auto Rraw = input();
-
-        cout << "Enter L face:\n";
-        auto Lraw = input();
-
-        cout << "Enter B face:\n";
-        auto Braw = input();
-
+        auto Uraw = inputFaces[0];
+        auto Fraw = inputFaces[1];
+        auto Draw = inputFaces[2];
+        auto Rraw = inputFaces[3];
+        auto Lraw = inputFaces[4];
+        auto Braw = inputFaces[5];
 
         /*
             Determine the colour of each physical face from
@@ -290,27 +275,6 @@ int main()
 {
     Cube cub;
     tsmltoseg ob;
-    cout<<R"(             |************|
-             |*U1**U2**U3*|
-             |************|
-             |*U4**U5**U6*|
-             |************|
-             |*U7**U8**U9*|
-             |************|
- ************|************|************|************
- *L1**L2**L3*|*F1**F2**F3*|*R1**R2**R3*|*B1**B2**B3*
- ************|************|************|************
- *L4**L5**L6*|*F4**F5**F6*|*R4**R5**R6*|*B4**B5**B6*
- ************|************|************|************
- *L7**L8**L9*|*F7**F8**F9*|*R7**R8**R9*|*B7**B8**B9*
- ************|************|************|************
-             |************|
-             |*D1**D2**D3*|
-             |************|
-             |*D4**D5**D6*|
-             |************|
-             |*D7**D8**D9*|
-             |************|)"<<"\n";
     cub=ob.usrinp();
     inpproc ip;
     Cubieste cb;
@@ -378,4 +342,3 @@ int main()
     return 0;
 }
 
-//still there is abi error in co calculatio and icannot get rid of it i am leaving it at this will return later and until then buy 
