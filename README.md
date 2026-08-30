@@ -1,34 +1,212 @@
-# Rubik's Cube Solver (Kociemba Two-Phase Algorithm) A C++ implementation of a Rubik's Cube solver based on Herbert Kociemba's two-phase algorithm. The program takes a scrambled cube as sticker-color input, converts it into a cubie-level representation, and searches for a solution using IDA* search guided by precomputed pruning (heuristic) tables. ## Overview The solver works in two phases, following the classic Kociemba approach: - **Phase 1** — Reduce the cube from the general group **G0** into the subgroup **G1**, where all corners are correctly oriented, all edges are correctly oriented, and the four E-slice edges (FL, FR, BL, BR) stay within the E-slice. This phase uses all 18 face turns. - **Phase 2** — Solve the cube completely from **G1**, using only the moves that keep the cube inside G1: U, U2, U', D, D2, D', L2, R2, F2, B2. Both phases are searched with **IDA\*** (iterative-deepening A*), where the heuristic is read from pruning tables that are either loaded from disk or generated via breadth-first search (BFS) on first run. ## Project Structure The code is organized into logical modules (paths as referenced by the #include directives in main.cpp):
+# Rubik's Cube Solver
+
+A C++ implementation of a **Rubik's Cube solver based on Herbert Kociemba's Two-Phase Algorithm**.
+
+The program accepts a scrambled cube as sticker-color input, converts it into a cubie-level representation, validates the cube configuration, and searches for a solution using **IDA*** guided by precomputed pruning tables.
+
+---
+
+## Table of Contents
+
+* [Overview](#overview)
+* [How the Solver Works](#how-the-solver-works)
+* [Project Structure](#project-structure)
+* [Coordinates and Pruning Tables](#coordinates-and-pruning-tables)
+* [Building](#building)
+* [Usage](#usage)
+* [Input and Output](#input-and-output)
+
+  * [Cube Input Layout](#cube-input-layout)
+  * [Face Input](#face-input)
+  * [Centre-Color Detection](#centre-color-detection)
+  * [Sticker-to-Cubie Conversion](#sticker-to-cubie-conversion)
+  * [Pruning Table Generation](#pruning-table-generation)
+  * [Search Output](#search-output)
+  * [Move Notation](#move-notation)
+* [Complete Solving Pipeline](#complete-solving-pipeline)
+* [Known Issues / TODO](#known-issues--todo)
+
+---
+
+## Overview
+
+The solver follows the classic **Kociemba Two-Phase Algorithm**.
+
+### Phase 1
+
+Phase 1 reduces the cube from the general group **G0** into the subgroup **G1**.
+
+The resulting cube must have:
+
+* All corners correctly oriented.
+* All edges correctly oriented.
+* The four E-slice edges (`FL`, `FR`, `BL`, `BR`) remaining within the E-slice.
+
+Phase 1 allows all **18 face turns**.
+
+### Phase 2
+
+Phase 2 solves the cube completely from **G1**.
+
+Only moves that keep the cube inside G1 are allowed:
+
+```text
+U  U2  U'
+D  D2  D'
+L2 R2 F2 B2
+```
+
+Both phases use **IDA*** (Iterative Deepening A*) search.
+
+The search is guided by heuristic values stored in pruning tables. These tables are loaded from disk when available and generated automatically using **Breadth-First Search (BFS)** when they are missing.
+
+---
+
+## How the Solver Works
+
+The overall process is:
+
+```text
+Sticker-color input
+        ↓
+Centre-color detection
+        ↓
+Sticker → Facelet representation
+        ↓
+Facelet → Cubie representation
+        ↓
+Cube validity checks
+        ↓
+Load / generate pruning tables
+        ↓
+Phase 1 IDA*
+        ↓
+Phase 2 IDA*
+        ↓
+Solution move sequence
+```
+
+---
+
+## Project Structure
+
+The project is divided into several logical modules:
+
+```text
 .
-├── main.cpp                  Entry point: reads user input, runs the solver
+├── main.cpp
+│   └── Program entry point and user input
 │
-├── inputproc/                 Sticker → cubie conversion
-│   ├── cube.hpp                Sticker-based Cube representation (6 faces × 9 stickers)
-│   ├── cubie.hpp                Cubie-based Cubieste representation (cp, co, ep, eo)
-│   ├── stk_to_cub.hpp/.cpp      Maps sticker colors to corner/edge permutation
-│   │                            and orientation (cp, co, ep, eo), plus parity
-│   │                            validation (inpvald)
+├── inputproc/
+│   ├── cube.hpp
+│   │   └── Sticker-based cube representation
+│   │
+│   ├── cubie.hpp
+│   │   └── Cubie-based representation (cp, co, ep, eo)
+│   │
+│   └── stk_to_cub.hpp/.cpp
+│       └── Sticker → cubie conversion,
+│           corner/edge orientation and
+│           permutation validation
 │
-├── rubicsmove/                Move engine
-│   ├── cubemove.hpp/.cpp        Applies the 18 face turns (U, U', U2, ... D')
-│   │                            directly to a Cubieste
+├── rubicsmove/
+│   └── cubemove.hpp/.cpp
+│       └── Cube move engine implementing
+│           the 18 face turns
 │
-├── bfstable/                  Coordinate encoding + pruning table generation
-│   ├── encoder.hpp/.cpp         Encodes/decodes cube state into compact
-│   │                            coordinates (CO, EO, slice, Lehmer codes for
-│   │                            corner/edge permutations)
-│   ├── bfs.hpp/.cpp              Breadth-first search over each coordinate
-│   │                            space to build the pruning tables
-│   ├── heuristictable.hpp/.cpp   Owns the pruning tables, generates them via
-│   │                            Bfs, and loads/saves them to disk (tables/)
+├── bfstable/
+│   ├── encoder.hpp/.cpp
+│   │   └── Coordinate encoding/decoding
+│   │
+│   ├── bfs.hpp/.cpp
+│   │   └── BFS-based pruning table generation
+│   │
+│   └── heuristictable.hpp/.cpp
+│       └── Pruning table management,
+│           generation, loading and saving
 │
-└── kociemba/                  Search
-    ├── DFS.hpp/.cpp              Phase 1 IDA* depth-first search
-    ├── DFS2.hpp/.cpp             Phase 2 IDA* depth-first search
-    └── kociemba_ph1.hpp/.cpp     Phase 1 driver, G1 subgroup check, and the
-                                 cost/heuristic function for phase 1
-## Coordinates and Pruning Tables The solver represents cube state with four coordinates, each with its own pruning table combined with the E-slice edge permutation: | Table | Coordinate | Size | Used in | |---|---|---|---| | twistSliceTable | Corner orientation (CO) × Slice edge combination | 2187 × 495 | Phase 1 | | flipSliceTable | Edge orientation (EO) × Slice edge combination | 2048 × 495 | Phase 1 | | cpSliceTable | Corner permutation (CP) × Slice edge permutation | 40320 × 24 | Phase 2 | | udEdgeSliceTable | UD edge permutation × Slice edge permutation | 40320 × 24 | Phase 2 | Each table stores, for every coordinate, the minimum number of moves needed to reach the solved state for that coordinate — computed once via BFS (Bfs::bfstwstsls, bfsflpsls, bfscpsls, bfsepsls) and reused as an admissible heuristic during IDA* search (cost_f_n1, cost_f_n2). Tables are stored under tables/ as raw binary (uint8_t per entry): - tables/twist_slice.bin - tables/flip_slice.bin - tables/cp_slice.bin - tables/udedge_slice.bin On startup, Heuristictable::load_or_generatetable() checks whether all four files exist. If they do, it loads them; otherwise it generates them from scratch and writes them out, so subsequent runs start instantly. > Note: table generation can take noticeable time and memory on first run > (the twist/flip tables alone have over a million entries each). Once > generated, they only need to be built once. ## Building No build system (CMake/Makefile) is included in this snapshot; the project can be compiled directly with any C++17-capable compiler, keeping the directory layout above intact so the relative #include paths resolve. Example with g++:
-bash
+└── kociemba/
+    ├── DFS.hpp/.cpp
+    │   └── Phase 1 IDA* search
+    │
+    ├── DFS2.hpp/.cpp
+    │   └── Phase 2 IDA* search
+    │
+    └── kociemba_ph1.hpp/.cpp
+        └── Phase 1 driver, G1 subgroup
+            check and heuristic/cost functions
+```
+
+---
+
+## Coordinates and Pruning Tables
+
+The solver uses four coordinate-based pruning tables.
+
+| Table              | Coordinate                                       |         Size | Used in |
+| ------------------ | ------------------------------------------------ | -----------: | ------- |
+| `twistSliceTable`  | Corner orientation (CO) × slice-edge combination | `2187 × 495` | Phase 1 |
+| `flipSliceTable`   | Edge orientation (EO) × slice-edge combination   | `2048 × 495` | Phase 1 |
+| `cpSliceTable`     | Corner permutation (CP) × slice-edge permutation | `40320 × 24` | Phase 2 |
+| `udEdgeSliceTable` | UD-edge permutation × slice-edge permutation     | `40320 × 24` | Phase 2 |
+
+Each table stores the minimum number of moves required to reach the solved state for a particular coordinate.
+
+The tables are generated using BFS:
+
+```text
+Bfs::bfstwstsls()
+Bfs::bfsflpsls()
+Bfs::bfscpsls()
+Bfs::bfsepsls()
+```
+
+The resulting values are reused as admissible heuristics during IDA* search.
+
+### Table Files
+
+The generated tables are stored as raw binary files containing one `uint8_t` value per entry:
+
+```text
+tables/
+├── twist_slice.bin
+├── flip_slice.bin
+├── cp_slice.bin
+└── udedge_slice.bin
+```
+
+On startup, the solver checks whether all four files exist.
+
+If they do:
+
+```text
+Loading pruning tables...
+```
+
+Otherwise:
+
+```text
+Pruning tables not found.
+Generating tables...
+```
+
+The generated tables are then saved to the `tables/` directory and reused on subsequent runs.
+
+> **Note:** Table generation can take noticeable time and memory on the first run. The twist and flip tables alone contain more than one million entries each. Once generated, the tables only need to be built once.
+
+---
+
+## Building
+
+This project currently does **not include a CMake or Makefile build system**.
+
+It can be compiled directly using any compiler supporting **C++17**.
+
+### Using g++
+
+From the project root:
+
+```bash
 g++ -std=c++17 -O2 \
     main.cpp \
     inputproc/stk_to_cub.cpp \
@@ -40,17 +218,41 @@ g++ -std=c++17 -O2 \
     kociemba/DFS.cpp \
     kociemba/DFS2.cpp \
     -o cube_solver
-## Usage Run the compiled binary and follow the prompts. You'll be asked to enter the 9 stickers of each face (U, F, D, R, L, B in that order), typed as color letters: | Letter | Color | |---|---| | W | White | | G | Green | | Y | Yellow | | R | Red | | O | Orange | | B | Blue | The program expects the standard orientation: white up / green front for the U and F faces, and each subsequent face entered with the color matching its own center facing up, as described in the on-screen prompts.
+```
+
+Then run:
+
+```bash
 ./cube_solver
-The program will: 1. Parse your sticker input into a cubie representation (cornerinfer, edgeinfer). 2. Validate the input (permutation parity, corner/edge orientation parity) and reject invalid scrambles. 3. Load or generate the pruning tables. 4. Run phase 1 and phase 2 IDA* search, printing the bound explored at each iteration. 5. Print the full move sequence (phase 1 + phase 2) in standard cube notation, e.g. U F2 R' ... | D2 L2 .... 
+```
 
-## Input and Output
+---
 
-The solver uses an **interactive terminal-based input/output interface**.
+## Usage
 
-### Input
+Run the compiled program:
 
-When the program starts, it first displays a net of the cube showing the positions of all 54 facelets:
+```bash
+./cube_solver
+```
+
+The program displays a cube net and asks you to enter the stickers for each face.
+
+The faces are entered in this order:
+
+```text
+U F D R L B
+```
+
+Each face requires **9 sticker colors**.
+
+---
+
+# Input and Output
+
+## Cube Input Layout
+
+When the program starts, it displays the following cube net:
 
 ```text
              |************|
@@ -76,13 +278,17 @@ When the program starts, it first displays a net of the cube showing the positio
              |************|
 ```
 
-The program then asks for the six faces in the following order:
+---
+
+## Face Input
+
+The six faces are entered in this order:
 
 ```text
 U F D R L B
 ```
 
-Each face requires **9 sticker colors**, entered as capital-letter color symbols:
+Each sticker is represented by a capital-letter color symbol:
 
 | Letter | Color  |
 | ------ | ------ |
@@ -93,16 +299,19 @@ Each face requires **9 sticker colors**, entered as capital-letter color symbols
 | `O`    | Orange |
 | `G`    | Green  |
 
-The nine stickers can be entered as three rows of three characters. For example:
+Each face can be entered as three rows of three characters.
+
+Example:
 
 ```text
-Enter U face with capital letter colour symbol like W=white Y=yellow R=red B=blue O=orange G=green:
+Enter U face:
+
 BRG
 ROB
 GOR
 ```
 
-The same process is repeated for the remaining five faces:
+The same process is repeated for the remaining faces:
 
 ```text
 Enter F face:
@@ -131,11 +340,13 @@ OWY
 WYG
 ```
 
-### Centre-Color Detection
+---
 
-The center sticker of each face is used to determine the relationship between the input colors and the solver's internal face notation.
+## Centre-Color Detection
 
-For example, the program may report:
+The center sticker of each face determines the relationship between the physical cube colors and the solver's internal face notation.
+
+For example:
 
 ```text
 Detected centre mapping:
@@ -147,11 +358,13 @@ L = B
 B = W
 ```
 
-This allows the solver to work with arbitrary physical color orientations rather than assuming that a particular color is always on a particular face.
+This allows the solver to work with different physical color orientations rather than assuming that a specific color is always assigned to a specific face.
 
-### Sticker-to-Cubie Conversion
+---
 
-After reading the input, the solver converts the sticker representation into its internal **cubie representation**.
+## Sticker-to-Cubie Conversion
+
+After reading the sticker input, the solver converts the sticker representation into its internal **cubie representation**.
 
 It first prints the converted facelets in `UFDRLB` notation:
 
@@ -167,9 +380,12 @@ B: URBUBFBFR
 Input successfully converted to UFDRLB notation.
 ```
 
-The program then identifies every corner and edge, calculating its permutation and orientation.
+The solver then identifies all corners and edges and calculates their:
 
-Example corner output:
+* Permutation (`cp` / `ep`)
+* Orientation (`co` / `eo`)
+
+### Corner Example
 
 ```text
 Corner UFR: DRF -> cp = 4, co = 0
@@ -182,13 +398,18 @@ Corner DLB: DBR -> cp = 7, co = 0
 Corner DRB: ULB -> cp = 2, co = 0
 ```
 
-It also validates the corner orientation constraint:
+The corner orientation constraint is also checked:
 
 ```text
-Corner orientation sum = 0 + 2 + 1 + 1 + 2 + 0 + 0 + 0 = 6 mod 3 = 0
+Corner orientation sum
+= 0 + 2 + 1 + 1 + 2 + 0 + 0 + 0
+= 6 mod 3
+= 0
 ```
 
-The twelve edges are processed in the same way:
+### Edge Example
+
+The twelve edges are processed similarly:
 
 ```text
 Edge UF: UR -> ep = 3, eo = 0
@@ -207,16 +428,22 @@ Edge RF: DF -> ep = 4, eo = 0
 
 This conversion stage allows the solver to detect invalid cube configurations before starting the search.
 
-### Pruning Table Generation
+---
 
-If the pruning tables do not already exist, the program generates them automatically:
+## Pruning Table Generation
+
+If the pruning tables do not exist, they are generated automatically.
+
+The program prints:
 
 ```text
 Pruning tables not found.
 Generating tables...
 ```
 
-The four tables are generated using BFS:
+The four tables are generated using BFS.
+
+Example output:
 
 ```text
 Unvisited states: 0
@@ -238,18 +465,33 @@ the max level ud edge p slice is 12 which ended at 967680
 Tables generated and saved.
 ```
 
-The generated tables are saved in the `tables/` directory. On subsequent executions, they are loaded from disk instead of being regenerated.
-
-### Search Output
-
-Once the tables are available, the solver performs the two-phase IDA* search.
-
-During Phase 1, the program reports the search bounds:
+The resulting files are stored in:
 
 ```text
-One level is explored in phase 1. Bound: 7 | Next bound: 8 | Time: 0 ms
-One level is explored in phase 1. Bound: 8 | Next bound: 9 | Time: 0 ms
+tables/
 ```
+
+On subsequent executions, they are loaded from disk instead of being regenerated.
+
+---
+
+## Search Output
+
+Once the pruning tables are available, the solver performs the two-phase IDA* search.
+
+### Phase 1
+
+The program reports the search bounds explored during Phase 1:
+
+```text
+One level is explored in phase 1.
+Bound: 7 | Next bound: 8 | Time: 0 ms
+
+One level is explored in phase 1.
+Bound: 8 | Next bound: 9 | Time: 0 ms
+```
+
+### Phase 2
 
 Phase 2 similarly reports each completed search bound:
 
@@ -262,25 +504,33 @@ Phase 2 bound 12 completed | next bound = 13 | time = 0.00237412 seconds
 Phase 2 bound 13 completed | next bound = -1 | time = 0.00528594 seconds
 ```
 
-After a solution is found, the solver prints the moves produced by each phase:
+---
+
+## Solution Output
+
+After finding a solution, the solver prints the moves produced by each phase:
 
 ```text
-the solution steps in first phase are:-
+The solution steps in first phase are:-
 L B2 U' F U F L F R
 
-in the second phase:-
+In the second phase:-
 L2 U' B2 R2 F2 U L2 U' L2 U2 F2 D F2
 
-total steps needed are 22
+Total steps needed are 22
 ```
 
-The complete solution is therefore:
+The complete solution is:
 
 ```text
 L B2 U' F U F L F R L2 U' B2 R2 F2 U L2 U' L2 U2 F2 D F2
 ```
 
-The notation follows standard Rubik's Cube move notation:
+---
+
+## Move Notation
+
+The solver uses standard Rubik's Cube move notation.
 
 | Notation                     | Meaning                    |
 | ---------------------------- | -------------------------- |
@@ -294,13 +544,13 @@ For example:
 R
 ```
 
-means a clockwise right-face turn,
+means a clockwise right-face turn.
 
 ```text
 R'
 ```
 
-means a counter-clockwise right-face turn, and
+means a counter-clockwise right-face turn.
 
 ```text
 R2
@@ -308,44 +558,87 @@ R2
 
 means a 180° right-face turn.
 
-### Complete Example
+---
 
-A typical complete execution therefore follows this pipeline:
+## Complete Solving Pipeline
+
+A complete execution follows this pipeline:
 
 ```text
-Sticker-color input
-       ↓
-Centre-color detection
-       ↓
-Sticker → facelet conversion
-       ↓
-Facelet → cubie conversion
-       ↓
-Cube validity checks
-       ↓
-Load / generate pruning tables
-       ↓
-Phase 1 IDA*
-       ↓
-Phase 2 IDA*
-       ↓
-Solution move sequence
+┌─────────────────────────┐
+│ Sticker-color input     │
+└────────────┬────────────┘
+             ↓
+┌─────────────────────────┐
+│ Centre-color detection  │
+└────────────┬────────────┘
+             ↓
+┌─────────────────────────┐
+│ Sticker → facelet       │
+│ conversion              │
+└────────────┬────────────┘
+             ↓
+┌─────────────────────────┐
+│ Facelet → cubie         │
+│ conversion              │
+└────────────┬────────────┘
+             ↓
+┌─────────────────────────┐
+│ Cube validity checks    │
+└────────────┬────────────┘
+             ↓
+┌─────────────────────────┐
+│ Load / generate         │
+│ pruning tables          │
+└────────────┬────────────┘
+             ↓
+┌─────────────────────────┐
+│ Phase 1 IDA*            │
+└────────────┬────────────┘
+             ↓
+┌─────────────────────────┐
+│ Phase 2 IDA*            │
+└────────────┬────────────┘
+             ↓
+┌─────────────────────────┐
+│ Solution move sequence  │
+└─────────────────────────┘
 ```
 
-This makes the program a complete command-line pipeline from **physical cube sticker colors → cubie representation → heuristic search → solving sequence**.
+The project therefore provides a complete command-line pipeline:
+
+**Physical cube sticker colors → cubie representation → heuristic search → solving sequence**
+
+---
 
 ## Known Issues / TODO
 
-* The solver currently runs successfully and produces a complete solution sequence.
-* However, when the generated solution is physically applied to the scrambled cube, **four edges remain flipped** at the end:
+The solver currently:
 
-  * BL
-  * BD
-  * RB
-  * RF
-* This indicates that there is still an issue somewhere in the **edge orientation / move transformation / solution application pipeline**, despite the cube passing the current input validation and the search producing a solution.
-* Investigating the edge-orientation calculation (`eo`) and/or edge permutation/orientation transformations in the move engine is the next major debugging task.
+* Runs successfully.
+* Accepts and validates cube configurations.
+* Generates and loads pruning tables.
+* Performs both phases of the Kociemba search.
+* Produces a complete solution sequence.
 
+However, there is currently an issue when the generated solution is physically applied to the scrambled cube.
 
-## Known Issues / TODO - the code runs fine and solves every thing but even at the end 4 edges remin flipped after implementing the solving sequence on the scrambled cube the edges are nmely BL, BD, RB, RF.
+After applying the complete solution, **four edges remain flipped**:
 
+```text
+BL
+BD
+RB
+RF
+```
+
+This suggests that there is still an issue somewhere in the:
+
+* Edge orientation calculation (`eo`)
+* Edge permutation/orientation transformations
+* Move engine
+* Solution application pipeline
+
+The next major debugging task is therefore to investigate the edge-orientation calculation and/or the edge permutation/orientation transformations.
+
+---
