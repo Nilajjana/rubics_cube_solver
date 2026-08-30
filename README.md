@@ -606,19 +606,32 @@ The project therefore provides a complete interactive pipeline:
 
 The solver currently:
 
-* Runs successfully with the new interactive ncurses cube editor.
-* Accepts and validates cube configurations, including centre-color duplication/coverage checks and chirality-aware corner/edge identification that rejects impossible or mirrored input.
-* Generates and loads all four pruning tables (Phase 1 and Phase 2).
-* Performs both phases of the Kociemba search with bounds-checked coordinate decoding.
+* Runs successfully.
+* Accepts and validates cube configurations.
+* Generates and loads pruning tables.
+* Performs both phases of the Kociemba search.
 * Produces a complete solution sequence.
 
-Open items:
+However, there is currently an issue when the generated solution is physically applied to the scrambled cube.
 
-* **Re-verify the previously reported edge-flip bug.** An earlier version of this README noted that after applying the generated solution to a physical cube, four edges (`BL`, `BD`, `RB`, `RF`) remained flipped. The sticker-to-cubie decoding in `stk_to_cub.cpp` has since been substantially rewritten — corner identity/orientation now uses proper cyclic-rotation matching with per-position chirality handling instead of the old unordered-set comparison that could let mirrored/impossible corners through undetected. This class of bug is a plausible explanation for the original symptom, but it hasn't been explicitly re-tested against a physical cube yet, so it should be re-verified before being considered closed.
-* **Inappropriate language in `main.cpp`.** The "already solved" message contains an offensive slur and should be replaced with a normal message (e.g. `"The cube is already solved."`).
-* **Leftover debug `std::cout` statements in `stk_to_cub.cpp`.** `decodeCornerAt` and `decodeEdgeAt` unconditionally print every corner/edge decode to stdout. This is useful for the documented example output above, but should probably be gated behind a `--verbose` flag rather than always firing.
-* **Stale TODO comment in `heuristictable.cpp`.** `generateTables()` still has a leftover `// TODO: bf cpslice / bf udedge_slice` comment even though both calls (`bf.bfscpsls(...)`, `bf.bfsepsls(...)`) are already implemented directly above it. The comment should be removed.
-* **No automated tests.** There is currently no test suite covering the encoder/decoder round-trips, move engine, or search correctness.
-* **No build system file.** The project still relies on a manual `g++` command; a `CMakeLists.txt` or `Makefile` (now also needs to link `ncurses`) would make builds more reproducible.
+After applying the complete solution, **four edges remain flipped**:
+
+```text
+BL
+BD
+RB
+RF
+```
+
+This suggests that there is still an issue somewhere in the:
+
+* Edge orientation calculation (`eo`)
+* Edge permutation/orientation transformations
+* Move engine
+* Solution application pipeline
+
+The next major debugging task is therefore to investigate the edge-orientation calculation and/or the edge permutation/orientation transformations.
+
+---
 
 ---
