@@ -109,6 +109,8 @@ struct ColourScheme
     }
 };
 
+
+
 // index 4 of a 3x3 face (row-major) is always the centre sticker.
 static ColourScheme buildColourScheme(Cube& cube)
 {
@@ -172,6 +174,25 @@ static std::array<char, 2> homeEdgeLetters(int j)
 static void decodeCornerAt(Cube& cube, const ColourScheme& scheme, int i,
                            uint8_t& cpOut, uint8_t& coOut)
 {
+    // Which of the two chirality groups each fixed corner *position*
+    // belongs to (see corner[] array order: UFR, UFL, ULB, UBR, DFR,
+    // DFL, DLB, DRB). This is a property of the physical slot's axis
+    // handedness, not of which piece currently sits there.
+    //
+    // Group A (true):  R/L side-sticker -> co 1, F/B side-sticker -> co 2
+    // Group B (false): F/B side-sticker -> co 1, R/L side-sticker -> co 2
+    static const bool isGroupA[8] =
+    {
+        true,   // UFR
+        false,  // UFL
+        true,   // ULB
+        false,  // UBR
+        false,  // DFR
+        true,   // DFL
+        false,  // DLB
+        true    // DRB
+    };
+
     std::array<char, 3> actual = {
         scheme.lookup(getsticker(cube, corner[i].sticker[0])),
         scheme.lookup(getsticker(cube, corner[i].sticker[1])),
@@ -209,8 +230,9 @@ static void decodeCornerAt(Cube& cube, const ColourScheme& scheme, int i,
          *   slot 2 = side face
          *
          * co is therefore the slot containing the U/D sticker,
-         * but we must normalize the two side slots according to
-         * the Kociemba convention.
+         * but which side-face maps to co=1 vs co=2 depends on the
+         * chirality group of this physical position (see isGroupA[]
+         * above) -- it is NOT the same rule for all 8 positions.
          */
 
         int udSlot = -1;
@@ -231,11 +253,12 @@ static void decodeCornerAt(Cube& cube, const ColourScheme& scheme, int i,
         else
         {
             Face f = corner[i].sticker[udSlot].face;
+            bool onSide_RL = (f == R || f == L);
 
-            if (f == R || f == L)
-                coOut = 1;
+            if (isGroupA[i])
+                coOut = onSide_RL ? 1 : 2;
             else
-                coOut = 2;
+                coOut = onSide_RL ? 2 : 1;
         }
 
         std::cout << "Corner " << CORNER_NAMES[i] << ": "
