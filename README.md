@@ -2,7 +2,7 @@
 
 A C++ implementation of a **Rubik's Cube solver based on Herbert Kociemba's Two-Phase Algorithm**.
 
-The program accepts a scrambled cube as sticker-color input, converts it into a cubie-level representation, validates the cube configuration, and searches for a solution using **IDA*** guided by precomputed pruning tables.
+The program presents an interactive, on-screen cube net that the user fills in with sticker colors, converts that input into a cubie-level representation, validates the cube configuration, and searches for a solution using **IDA*** guided by precomputed pruning tables.
 
 ---
 
@@ -16,8 +16,7 @@ The program accepts a scrambled cube as sticker-color input, converts it into a 
 * [Usage](#usage)
 * [Input and Output](#input-and-output)
 
-  * [Cube Input Layout](#cube-input-layout)
-  * [Face Input](#face-input)
+  * [Interactive Cube Editor](#interactive-cube-editor)
   * [Centre-Color Detection](#centre-color-detection)
   * [Sticker-to-Cubie Conversion](#sticker-to-cubie-conversion)
   * [Pruning Table Generation](#pruning-table-generation)
@@ -67,9 +66,9 @@ The search is guided by heuristic values stored in pruning tables. These tables 
 The overall process is:
 
 ```text
-Sticker-color input
+Interactive sticker-color input (ncurses)
         ↓
-Centre-color detection
+Centre-color detection & validation
         ↓
 Sticker → Facelet representation
         ↓
@@ -95,7 +94,8 @@ The project is divided into several logical modules:
 ```text
 .
 ├── main.cpp
-│   └── Program entry point and user input
+│   └── Program entry point, centre-color mapping,
+│       and top-level validation
 │
 ├── inputproc/
 │   ├── cube.hpp
@@ -104,10 +104,18 @@ The project is divided into several logical modules:
 │   ├── cubie.hpp
 │   │   └── Cubie-based representation (cp, co, ep, eo)
 │   │
+│   ├── cube_inp.hpp/.cpp
+│   │   └── Interactive ncurses cube-net editor:
+│   │       renders the net, handles arrow-key
+│   │       navigation and colour entry, and
+│   │       returns the six completed faces
+│   │
 │   └── stk_to_cub.hpp/.cpp
-│       └── Sticker → cubie conversion,
-│           corner/edge orientation and
-│           permutation validation
+│       └── Sticker → cubie conversion. Builds a
+│           self-consistent colour scheme from the
+│           six centre stickers, then identifies each
+│           corner/edge and its orientation, and
+│           validates permutation parity
 │
 ├── rubicsmove/
 │   └── cubemove.hpp/.cpp
@@ -116,7 +124,8 @@ The project is divided into several logical modules:
 │
 ├── bfstable/
 │   ├── encoder.hpp/.cpp
-│   │   └── Coordinate encoding/decoding
+│   │   └── Coordinate encoding/decoding, including
+│   │       bounds-checked Lehmer-code decoding
 │   │
 │   ├── bfs.hpp/.cpp
 │   │   └── BFS-based pruning table generation
@@ -163,6 +172,16 @@ Bfs::bfsepsls()
 
 The resulting values are reused as admissible heuristics during IDA* search.
 
+### Coordinate Decoding Safety
+
+`Encoder::decodeLehmer8` and `Encoder::decodeLehmer4` (used to invert the corner-permutation and slice-permutation coordinates) now validate their input before decoding:
+
+* A null output pointer throws `std::invalid_argument`.
+* An index outside the valid range (`[0, 8!)` or `[0, 4!)`) throws `std::out_of_range`.
+* Internally, the shared `decodePermutation<N>` helper also defensively clamps each digit to the remaining candidate count, so a corrupted or truncated coordinate can never read past the end of its working array.
+
+This makes the coordinate layer fail loudly on malformed input instead of silently producing an undefined permutation.
+
 ### Table Files
 
 The generated tables are stored as raw binary files containing one `uint8_t` value per entry:
@@ -200,7 +219,17 @@ The generated tables are then saved to the `tables/` directory and reused on sub
 
 This project currently does **not include a CMake or Makefile build system**.
 
-It can be compiled directly using any compiler supporting **C++17**.
+It can be compiled directly using any compiler supporting **C++17**. Because the cube-input editor (`inputproc/cube_inp.cpp`) uses **ncurses** for the interactive terminal UI, `ncurses` must be installed and linked.
+
+### Installing ncurses
+
+```bash
+# Debian / Ubuntu
+sudo apt install libncurses-dev
+
+# macOS (Homebrew)
+brew install ncurses
+```
 
 ### Using g++
 
@@ -210,6 +239,7 @@ From the project root:
 g++ -std=c++17 -O2 \
     main.cpp \
     inputproc/stk_to_cub.cpp \
+    inputproc/cube_inp.cpp \
     rubicsmove/cubemove.cpp \
     bfstable/encoder.cpp \
     bfstable/bfs.cpp \
@@ -217,6 +247,7 @@ g++ -std=c++17 -O2 \
     kociemba/kociemba_ph1.cpp \
     kociemba/DFS.cpp \
     kociemba/DFS2.cpp \
+    -lncurses \
     -o cube_solver
 ```
 
@@ -236,117 +267,72 @@ Run the compiled program:
 ./cube_solver
 ```
 
-The program displays a cube net and asks you to enter the stickers for each face.
-
-The faces are entered in this order:
-
-```text
-U F D R L B
-```
-
-Each face requires **9 sticker colors**.
+An interactive, full-screen cube net opens in the terminal. Navigate it with the arrow keys and fill in every sticker's color, then press **ENTER** to hand the completed cube off to the solver.
 
 ---
 
 # Input and Output
 
-## Cube Input Layout
+## Interactive Cube Editor
 
-When the program starts, it displays the following cube net:
-
-```text
-             |************|
-             |*U1**U2**U3*|
-             |************|
-             |*U4**U5**U6*|
-             |************|
-             |*U7**U8**U9*|
-             |************|
- ************|************|************|************
- *L1**L2**L3*|*F1**F2**F3*|*R1**R2**R3*|*B1**B2**B3*
- ************|************|************|************
- *L4**L5**L6*|*F4**F5**F6*|*R4**R5**R6*|*B4**B5**B6*
- ************|************|************|************
- *L7**L8**L9*|*F7**F8**F9*|*R7**R8**R9*|*B7**B8**B9*
- ************|************|************|************
-             |************|
-             |*D1**D2**D3*|
-             |************|
-             |*D4**D5**D6*|
-             |************|
-             |*D7**D8**D9*|
-             |************|
-```
-
----
-
-## Face Input
-
-The six faces are entered in this order:
+Input is no longer typed row-by-row. Instead, `CubeInput` (in `inputproc/cube_inp.cpp`) draws the full cube net with `ncurses` and lets you move a highlighted cursor around it:
 
 ```text
-U F D R L B
+RUBIK'S CUBE INPUT
+Arrow Keys: Move    U/Y/R/B/O/G: Set colour    ENTER: Confirm
+
+                    [ ] [ ] [ ]
+
+                    [ ] [ ] [ ]
+
+                    [ ] [ ] [ ]
+
+    L               F               R               B
+
+    [ ] [ ] [ ]     [ ] [ ] [ ]     [ ] [ ] [ ]     [ ] [ ] [ ]
+
+    [ ] [ ] [ ]     [ ] [ ] [ ]     [ ] [ ] [ ]     [ ] [ ] [ ]
+
+    [ ] [ ] [ ]     [ ] [ ] [ ]     [ ] [ ] [ ]     [ ] [ ] [ ]
+
+
+
+                    D
+
+                    [ ] [ ] [ ]
+
+                    [ ] [ ] [ ]
+
+                    [ ] [ ] [ ]
+
+Current: U [1,1]
+Valid colours: W  Y  R  B  O  G
+Lowercase letters are automatically converted to uppercase.
+Press ENTER when the cube is completely entered.
 ```
 
-Each sticker is represented by a capital-letter color symbol:
+Controls:
 
-| Letter | Color  |
-| ------ | ------ |
-| `W`    | White  |
-| `Y`    | Yellow |
-| `R`    | Red    |
-| `B`    | Blue   |
-| `O`    | Orange |
-| `G`    | Green  |
+| Input                  | Effect                                                                 |
+| ----------------------- | ----------------------------------------------------------------------- |
+| Arrow keys             | Move the highlighted cursor between stickers, wrapping between faces (e.g. off the right edge of `L` moves onto `F`, off the bottom of `U` moves onto `F`, and so on) |
+| `W` `Y` `R` `B` `O` `G` | Set the color of the currently highlighted sticker (lowercase is upper-cased automatically) |
+| `ENTER`                 | Finish input and hand the completed net to the solver                 |
 
-Each face can be entered as three rows of three characters.
-
-Example:
-
-```text
-Enter U face:
-
-BRG
-ROB
-GOR
-```
-
-The same process is repeated for the remaining faces:
-
-```text
-Enter F face:
-YGG
-GYY
-YRB
-
-Enter D face:
-RBY
-ORW
-ROO
-
-Enter R face:
-YWW
-RGW
-OGB
-
-Enter L face:
-RWO
-BBY
-WBB
-
-Enter B face:
-OGW
-OWY
-WYG
-```
+The currently selected sticker is shown in reverse video, and the status line at the bottom (`Current: U [1,1]`) always reports which face/row/column the cursor is on. Every sticker starts blank (`[ ]`) so it's obvious at a glance which ones still need a color before pressing `ENTER`.
 
 ---
 
 ## Centre-Color Detection
 
-The center sticker of each face determines the relationship between the physical cube colors and the solver's internal face notation.
+The centre sticker of each face determines the relationship between the physical cube's colors and the solver's internal face notation (`U F D R L B`). Centre stickers never move relative to one another, so whatever color sits at a face's centre position *is* that face's color for this particular cube — nothing is hardcoded to a fixed scheme like "white = Up".
 
-For example:
+This mapping is validated in two places:
+
+1. **`main.cpp` (`tsmltoseg::usrinp`)** — after the editor returns, it checks that all six centre colors are distinct and that every centre color occurs exactly 9 times across the whole cube, exiting with an error message before any solving work begins if either check fails. It then builds a `colour → face` map from the six centres and converts every sticker on every face into `U`/`F`/`D`/`R`/`L`/`B` notation.
+2. **`stk_to_cub.cpp` (`ColourScheme` / `buildColourScheme`)** — independently builds the same kind of colour-to-face mapping from the (already face-labelled) cube's centres, throwing `std::invalid_argument` if two centres share a color or if a sticker's color never appears as any centre.
+
+Example output:
 
 ```text
 Detected centre mapping:
@@ -358,15 +344,13 @@ L = B
 B = W
 ```
 
-This allows the solver to work with different physical color orientations rather than assuming that a specific color is always assigned to a specific face.
+This allows the solver to work with any physical color orientation rather than assuming a specific color always maps to a specific face.
 
 ---
 
 ## Sticker-to-Cubie Conversion
 
-After reading the sticker input, the solver converts the sticker representation into its internal **cubie representation**.
-
-It first prints the converted facelets in `UFDRLB` notation:
+After the interactive input is complete and converted to `UFDRLB` notation, the solver converts the sticker representation into its internal **cubie representation**.
 
 ```text
 Converted cube:
@@ -385,7 +369,11 @@ The solver then identifies all corners and edges and calculates their:
 * Permutation (`cp` / `ep`)
 * Orientation (`co` / `eo`)
 
-### Corner Example
+### Corner Identification and Orientation
+
+Each physical corner position is checked against the three stickers actually observed there. `decodeCornerAt` looks for a **cyclic rotation** match against every possible corner identity's "home" sticker triple — a real corner can only be twisted in place, never mirrored, so only rotation matches are accepted. Anything else (an impossible or mistyped sticker combination) is rejected with a thrown `std::runtime_error` instead of being silently forced into some identity.
+
+Once the identity (`cp`) is found, orientation (`co`) is derived from which physical slot the piece's U/D-facing sticker landed in. Because the two "chirality groups" of corner positions map their R/L and F/B side-stickers to `co = 1` vs `co = 2` in opposite ways, this mapping is looked up per-position (`isGroupA[]`) rather than assumed to be uniform across all eight corners — this is what previously allowed some mirrored/impossible corners to slip through undetected.
 
 ```text
 Corner UFR: DRF -> cp = 4, co = 0
@@ -407,9 +395,9 @@ Corner orientation sum
 = 0
 ```
 
-### Edge Example
+### Edge Identification and Orientation
 
-The twelve edges are processed similarly:
+The twelve edges are processed similarly: each position's two observed stickers are compared to every edge identity's home pair in both orders — a match in the original order means `eo = 0`, a match in swapped order means `eo = 1`. A position that matches neither order for any identity throws `std::runtime_error`.
 
 ```text
 Edge UF: UR -> ep = 3, eo = 0
@@ -426,7 +414,7 @@ Edge BR: UB -> ep = 2, eo = 0
 Edge RF: DF -> ep = 4, eo = 0
 ```
 
-This conversion stage allows the solver to detect invalid cube configurations before starting the search.
+This conversion stage lets the solver reject invalid cube configurations before starting the search, rather than searching against a malformed cube state.
 
 ---
 
@@ -566,11 +554,13 @@ A complete execution follows this pipeline:
 
 ```text
 ┌─────────────────────────┐
-│ Sticker-color input     │
+│ Interactive sticker      │
+│ input (ncurses)          │
 └────────────┬────────────┘
              ↓
 ┌─────────────────────────┐
 │ Centre-color detection  │
+│ & validation             │
 └────────────┬────────────┘
              ↓
 ┌─────────────────────────┐
@@ -580,7 +570,8 @@ A complete execution follows this pipeline:
              ↓
 ┌─────────────────────────┐
 │ Facelet → cubie         │
-│ conversion              │
+│ conversion (chirality-  │
+│ aware, rejects mirrors) │
 └────────────┬────────────┘
              ↓
 ┌─────────────────────────┐
@@ -605,7 +596,7 @@ A complete execution follows this pipeline:
 └─────────────────────────┘
 ```
 
-The project therefore provides a complete command-line pipeline:
+The project therefore provides a complete interactive pipeline:
 
 **Physical cube sticker colors → cubie representation → heuristic search → solving sequence**
 
@@ -615,30 +606,19 @@ The project therefore provides a complete command-line pipeline:
 
 The solver currently:
 
-* Runs successfully.
-* Accepts and validates cube configurations.
-* Generates and loads pruning tables.
-* Performs both phases of the Kociemba search.
+* Runs successfully with the new interactive ncurses cube editor.
+* Accepts and validates cube configurations, including centre-color duplication/coverage checks and chirality-aware corner/edge identification that rejects impossible or mirrored input.
+* Generates and loads all four pruning tables (Phase 1 and Phase 2).
+* Performs both phases of the Kociemba search with bounds-checked coordinate decoding.
 * Produces a complete solution sequence.
 
-However, there is currently an issue when the generated solution is physically applied to the scrambled cube.
+Open items:
 
-After applying the complete solution, **four edges remain flipped**:
-
-```text
-BL
-BD
-RB
-RF
-```
-
-This suggests that there is still an issue somewhere in the:
-
-* Edge orientation calculation (`eo`)
-* Edge permutation/orientation transformations
-* Move engine
-* Solution application pipeline
-
-The next major debugging task is therefore to investigate the edge-orientation calculation and/or the edge permutation/orientation transformations.
+* **Re-verify the previously reported edge-flip bug.** An earlier version of this README noted that after applying the generated solution to a physical cube, four edges (`BL`, `BD`, `RB`, `RF`) remained flipped. The sticker-to-cubie decoding in `stk_to_cub.cpp` has since been substantially rewritten — corner identity/orientation now uses proper cyclic-rotation matching with per-position chirality handling instead of the old unordered-set comparison that could let mirrored/impossible corners through undetected. This class of bug is a plausible explanation for the original symptom, but it hasn't been explicitly re-tested against a physical cube yet, so it should be re-verified before being considered closed.
+* **Inappropriate language in `main.cpp`.** The "already solved" message contains an offensive slur and should be replaced with a normal message (e.g. `"The cube is already solved."`).
+* **Leftover debug `std::cout` statements in `stk_to_cub.cpp`.** `decodeCornerAt` and `decodeEdgeAt` unconditionally print every corner/edge decode to stdout. This is useful for the documented example output above, but should probably be gated behind a `--verbose` flag rather than always firing.
+* **Stale TODO comment in `heuristictable.cpp`.** `generateTables()` still has a leftover `// TODO: bf cpslice / bf udedge_slice` comment even though both calls (`bf.bfscpsls(...)`, `bf.bfsepsls(...)`) are already implemented directly above it. The comment should be removed.
+* **No automated tests.** There is currently no test suite covering the encoder/decoder round-trips, move engine, or search correctness.
+* **No build system file.** The project still relies on a manual `g++` command; a `CMakeLists.txt` or `Makefile` (now also needs to link `ncurses`) would make builds more reproducible.
 
 ---
