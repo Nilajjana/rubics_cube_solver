@@ -129,17 +129,16 @@ Cubieste Moves::R(const Cubieste& cube)
     result.co[7] = (cube.co[3] + 2) % 3;
     result.co[4] = (cube.co[7] + 1) % 3;
 
-    // Edges — fixed to a proper 4-cycle: UR -> RF -> BR -> DR -> UR
+    // Edges — proper 4-cycle: UR -> BR -> DR -> RF -> UR
+    result.ep[10] = cube.ep[3];  // BR <- UR
+    result.ep[7]  = cube.ep[10]; // DR <- BR
+    result.ep[11] = cube.ep[7];  // RF <- DR
     result.ep[3]  = cube.ep[11]; // UR <- RF
-    result.ep[11] = cube.ep[10]; // RF <- BR
-    result.ep[10] = cube.ep[7];  // BR <- DR
-    result.ep[7]  = cube.ep[3];  // DR <- UR
-
+    
+    result.eo[10] = cube.eo[3];
+    result.eo[7]  = cube.eo[10];
+    result.eo[11] = cube.eo[7];
     result.eo[3]  = cube.eo[11];
-    result.eo[11] = cube.eo[10];
-    result.eo[10] = cube.eo[7];
-    result.eo[7]  = cube.eo[3];
-
     return result;
 }
 
