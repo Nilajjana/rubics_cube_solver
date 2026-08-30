@@ -146,8 +146,8 @@ The program will:
 
 ## Known Issues / TODO
 
-- the code runs fine and solves every thing but even at the end 9 edges remin
+- the code runs fine and solves every thing but even at the end 4 edges remin
   flipped after implementing the solving sequence on the scrambled cube the 
-  edges are nmely UF, FL, FR, BD, UL, DL, DR.
+  edges are nmely BL, BD, RB,  RF.
 
 
