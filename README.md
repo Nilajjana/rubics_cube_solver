@@ -321,6 +321,9 @@ Controls:
 
 The currently selected sticker is shown in reverse video, and the status line at the bottom (`Current: U [1,1]`) always reports which face/row/column the cursor is on. Every sticker starts blank (`[ ]`) so it's obvious at a glance which ones still need a color before pressing `ENTER`.
 
+## Live Demo
+https://github.com/user-attachments/assets/e9b9a0cb-8480-46ec-9e04-8dc540e4761d
+
 ---
 
 ## Centre-Color Detection
