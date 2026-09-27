@@ -1,104 +1,90 @@
 
-#include "../inputproc/cubie.hpp"
-#include <vector>
 #include "DFS2.hpp"
-#include "kociemba_ph1.hpp"
-#include "../bfstable/bfs.hpp"
 #include "../bfstable/encoder.hpp"
 #include "../bfstable/heuristictable.hpp"
+#include "../inputproc/cubie.hpp"
 #include "../rubicsmove/cubemove.hpp"
 #include "DFS.hpp"
-#include <iostream>
+#include "kociemba_ph1.hpp"
 #include <chrono>
+#include <iostream>
+#include <vector>
 
-namespace
-{
-    int cp_sls_crdnt(Cubieste cb)
-    {
-        Encoder ec;
-        int cdcp=ec.lehmer8coder(cb.cp);
-        int cdsl2=ec.lehmer4(&cb.ep[8]);
-        int crdnt=cdcp*24+cdsl2;
-        return crdnt;
-    }
-    int udEdge_sls_crdnt(Cubieste cb)
-    {
-        Encoder ec;
-        int cdep=ec.lehmer8coder(cb.ep);
-        int cdsl2=ec.lehmer4(&cb.ep[8]);
-        int crdnt=cdep*24+cdsl2;
-        return crdnt;
-    }
+namespace {
+int cp_sls_crdnt(Cubieste cb) {
+  Encoder ec;
+  int cdcp = ec.lehmer8coder(cb.cp);
+  int cdsl2 = ec.lehmer4(&cb.ep[8]);
+  int crdnt = cdcp * 24 + cdsl2;
+  return crdnt;
+}
+int udEdge_sls_crdnt(Cubieste cb) {
+  Encoder ec;
+  int cdep = ec.lehmer8coder(cb.ep);
+  int cdsl2 = ec.lehmer4(&cb.ep[8]);
+  int crdnt = cdep * 24 + cdsl2;
+  return crdnt;
+}
+} // namespace
+
+int Dfs2::cost_f_n2(Cubieste cb) {
+  int crdnt1 = Heuristic::cpSliceTable[cp_sls_crdnt(cb)];
+  int crdnt2 = Heuristic::udEdgeSliceTable[udEdge_sls_crdnt(cb)];
+  return std::max(crdnt1, crdnt2);
 }
 
-int Dfs2::cost_f_n2(Cubieste cb)
-{
-    int crdnt1=Heuristic::cpSliceTable[cp_sls_crdnt(cb)];
-    int crdnt2=Heuristic::udEdgeSliceTable[udEdge_sls_crdnt(cb)];
-    return std::max(crdnt1,crdnt2);
+bool Dfs2::kociembaPhase2(Cubieste cb) {
+  int h = cost_f_n2(cb);
+
+  while (true) {
+    auto start = std::chrono::steady_clock::now();
+
+    int result = dFs2(cb, 0, h, -1);
+
+    auto end = std::chrono::steady_clock::now();
+
+    std::chrono::duration<double> elapsed = end - start;
+
+    std::cout << "Phase 2 bound " << h << " completed"
+              << " | next bound = " << result << " | time = " << elapsed.count()
+              << " seconds\n";
+
+    if (result == -1) {
+      return true;
+    }
+
+    h = result;
+  }
+
+  return false;
 }
 
-bool Dfs2::kociembaPhase2(Cubieste cb)
-{
-    int h = cost_f_n2(cb);
+int Dfs2::dFs2(const Cubieste &cb, int g, int bound, int lastmv) {
+  Dfs2 kp2;
+  KociembaPhase1 kp1;
+  int h = kp2.cost_f_n2(cb);
+  int f = g + h;
+  if (f > bound)
+    return f;
+  if (kp1.soln_chkr(cb)) {
+    return -1;
+  }
+  Cubieste next;
+  int minin = 255;
+  Moves mov;
+  for (int i : moves2::kPhase2Moves) {
+    if (redundancy_chk::redun_dnt(lastmv, i))
+      continue;
 
-    while (true)
-    {
-        auto start = std::chrono::steady_clock::now();
+    next = cb;
+    next = mov.applyMove(next, i);
+    solution_sets::solution2.push_back(i);
+    int result = dFs2(next, g + 1, bound, i);
+    if (result == -1)
+      return -1;
 
-        int result = dFs2(cb, 0, h, -1);
-
-        auto end = std::chrono::steady_clock::now();
-
-        std::chrono::duration<double> elapsed = end - start;
-
-        std::cout << "Phase 2 bound " << h
-                  << " completed"
-                  << " | next bound = " << result
-                  << " | time = " << elapsed.count()
-                  << " seconds\n";
-
-        if (result == -1)
-        {
-            return true;
-        }
-
-        h = result;
-    }
-
-    return false;
-}
-
-int Dfs2::dFs2(const Cubieste& cb,int g,int bound,int lastmv)
-{
-    Dfs2 kp2;
-    KociembaPhase1 kp1;
-    int h=kp2.cost_f_n2(cb);
-    int f=g+h;
-    if(f>bound)
-        return f;
-    if(kp1.soln_chkr(cb))
-    {
-        return -1;
-    }
-    Cubieste next;
-    int minin=255;
-    Moves mov;
-    for(int i:moves2::kPhase2Moves)
-    {
-        if(redundancy_chk::redun_dnt(lastmv,i))
-            continue;
-
-        next=cb;
-        next=mov.applyMove(next,i);
-        solution_sets::solution2.push_back(i);
-        int result=dFs2(next,g+1,bound,i);
-        if(result==-1)
-            return -1;
-        
-        minin=std::min(minin,result);
-        solution_sets::solution2.pop_back();
-        
-    }
-    return minin;
+    minin = std::min(minin, result);
+    solution_sets::solution2.pop_back();
+  }
+  return minin;
 }
